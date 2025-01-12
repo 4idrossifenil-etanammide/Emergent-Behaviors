@@ -51,7 +51,6 @@ class Renderer:
         dx /= length
         dy /= length
 
-         # Check for intersection with screen boundaries (same logic as before)
         intersection = None
 
         # Check intersection with the left boundary (x = 0)
@@ -82,6 +81,5 @@ class Renderer:
             if 0 <= x_bottom <= self.width:
                 intersection = (x_bottom, self.height)
 
-        # If we found a valid intersection, draw the line from the agent to the intersection
         if intersection:
             pygame.draw.line(self.screen, agent.get_color(), (x, y), intersection, 2)
