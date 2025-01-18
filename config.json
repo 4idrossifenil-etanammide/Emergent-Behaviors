@@ -1,0 +1,11 @@
+{
+    "world": {
+        "batch_size": 256,
+
+        "num_agents": 3,
+        "num_landmarks": 2,
+
+        "num_colors": 5,
+        "num_shapes": 5
+    }
+}
