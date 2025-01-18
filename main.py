@@ -14,10 +14,10 @@ def load_config(path: str  = "config.json"):
 def main():
     config = load_config()
 
-    world = World((800, 600), config["world"]) 
+    world = World(config["world"]) 
 
-#     renderer = Renderer(world)
-#     renderer.render()
+    #renderer = Renderer(world)
+    #renderer.render()
 
 if __name__ == "__main__":
     main()

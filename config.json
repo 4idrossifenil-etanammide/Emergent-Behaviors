@@ -2,6 +2,9 @@
     "world": {
         "batch_size": 256,
 
+        "height" : 600,
+        "width" : 600,
+
         "num_agents": 3,
         "num_landmarks": 2,
 
