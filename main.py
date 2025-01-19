@@ -1,6 +1,5 @@
 from world import World
-from agent import Agent
-from renderer import Renderer
+from physical_processor import Agent
 
 
 import random
@@ -14,10 +13,7 @@ def load_config(path: str  = "config.json"):
 def main():
     config = load_config()
 
-    world = World(config["world"]) 
-
-    #renderer = Renderer(world)
-    #renderer.render()
+    world = World(config) 
 
 if __name__ == "__main__":
     main()

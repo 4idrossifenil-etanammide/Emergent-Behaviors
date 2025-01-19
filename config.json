@@ -14,5 +14,9 @@
         "memory_size": 32,
         
         "timesteps": 100
+    },
+    "physical_processor":{
+        "hidden_size": 256
     }
+
 }

@@ -1,7 +1,7 @@
 from typing import Tuple
 from typing import List
 
-from agent import Agent
+from physical_processor import Agent
 
 import torch
 import torch.nn as nn
@@ -9,17 +9,19 @@ import torch.nn as nn
 class World(nn.Module):
     def __init__(self, config: dict):
 
-        self.height = config["height"]
-        self.width = config["width"]
-        self.num_agents = config["num_agents"]
-        self.num_landmarks = config["num_landmarks"]
-        self.num_shapes = config["num_shapes"]
-        self.batch_size = config["batch_size"]
-        self.memory_size = config["memory_size"]
-        self.timesteps = config["timesteps"]
+        world_config = config["world"]
+
+        self.height = world_config["height"]
+        self.width = world_config["width"]
+        self.num_agents = world_config["num_agents"]
+        self.num_landmarks = world_config["num_landmarks"]
+        self.num_shapes = world_config["num_shapes"]
+        self.batch_size = world_config["batch_size"]
+        self.memory_size = world_config["memory_size"]
+        self.timesteps = world_config["timesteps"]
 
         #create all of the agents and put them in a tensor
-        # shape: (batch_size, num_agents, 7)
+        # shape: (batch_size, num_agents, 10)
         self.agents = self.create_agents_batch()
         # shape: (batch_size, num_landmarks, 6)
         self.landmarks = self.create_landmarks_batch()
@@ -29,6 +31,8 @@ class World(nn.Module):
         self.communication = torch.zeros((self.batch_size, self.num_agents, 1))
 
         self.memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
+
+        
 
     #creates an agent, giving it a random position, a random color, a random gaze and
     # a velocity of 0
