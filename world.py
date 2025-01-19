@@ -15,6 +15,7 @@ class World:
         self.num_landmarks = config["num_landmarks"]
         self.num_shapes = config["num_shapes"]
         self.batch_size = config["batch_size"]
+        self.memory_size = config["memory_size"]
 
         #create all of the agents and put them in a tensor
         # shape: (batch_size, num_agents, 7)
@@ -23,6 +24,10 @@ class World:
         self.landmarks = self.create_landmarks_batch()
         # shape: (batch_size, num_agents, 2)
         self.goals = self.assign_goals()
+        
+        self.communication = torch.zeros((self.batch_size, self.num_agents, 1))
+
+        self.memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
 
     #creates an agent, giving it a random position, a random color, a random gaze and
     # a velocity of 0
@@ -48,3 +53,19 @@ class World:
         goal_type = torch.randint(0, 3, (self.batch_size, self.num_agents, 1)) # 0 do nothing, 1 look at landmark, 2 move to landmark
         goal_target = torch.randint(0, self.num_landmarks, (self.batch_size, self.num_agents, 1))
         return torch.cat((goal_type, goal_target), dim=2)
+    
+    def get_observation(self, agent_idx):
+        all_agents = self.agents.clone()  
+        all_landmarks = self.landmarks.clone()
+
+        # Instead of selecting directly using agent_idx, we select 
+        # using the agent_idx and agent_idx + 1 to avoid collapsing a dimension
+        private_goal = self.goals[:, agent_idx:agent_idx + 1, :] 
+        private_memory = self.memory[:, agent_idx:agent_idx + 1, :]  
+
+        observation = {
+            "physical_state": {"agents": all_agents, "landmarks": all_landmarks},
+            "communication": self.communication,
+            "private_info": {"goal": private_goal, "memory": private_memory},
+        }
+        return observation
