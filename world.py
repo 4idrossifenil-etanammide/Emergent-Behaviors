@@ -37,9 +37,9 @@ class World(nn.Module):
         velocity = torch.zeros((self.batch_size, self.num_agents, 2))
         gaze = torch.randint(0, self.width, (self.batch_size, self.num_agents, 2))
         color = torch.randint(0, 256, (self.batch_size, self.num_agents, 3))
-        shapes = torch.randint(0, self.num_shapes, (self.batch_size, self.num_agents, 1))
+        shape = torch.randint(0, self.num_shapes, (self.batch_size, self.num_agents, 1))
 
-        agents = torch.cat((pos, velocity, gaze, color, shapes), dim=2)
+        agents = torch.cat((pos, velocity, gaze, color, shape), dim=2)
         return agents
     
     def create_landmarks_batch(self):
@@ -73,5 +73,7 @@ class World(nn.Module):
     
     def forward(self):
         for timestep in self.timesteps:
+            #Given that from Figure 3 in the paper the physical features
+            #seems to be extracted once for all the agents, I'm doing the same here
             for agent_idx in range(self.num_agents):
                 observation = self.get_observation(agent_idx)
