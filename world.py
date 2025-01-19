@@ -1,7 +1,7 @@
 from typing import Tuple
 from typing import List
 
-from physical_processor import Agent
+from physical_processor import PhysicialProcessor
 
 import torch
 import torch.nn as nn
@@ -31,6 +31,8 @@ class World(nn.Module):
         self.communication = torch.zeros((self.batch_size, self.num_agents, 1))
 
         self.memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
+
+        self.physical_processor = PhysicialProcessor(config["physical_processor"])
 
         
 
@@ -75,5 +77,8 @@ class World(nn.Module):
         for timestep in self.timesteps:
             #Given that from Figure 3 in the paper the physical features
             #seems to be extracted once for all the agents, I'm doing the same here
+            agent_physical_features = self.physical_processor(self.agents)
+            landmark_physical_features = self.physical_processor(self.landmarks)
+            physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=0)
             for agent_idx in range(self.num_agents):
                 observation = self.get_observation(agent_idx)

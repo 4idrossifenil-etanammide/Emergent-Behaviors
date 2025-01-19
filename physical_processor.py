@@ -1,4 +1,5 @@
 import torch.nn as nn
+from softmax_pooling import SoftmaxPooling
 
 # In a nutshell, the agents have 10 different values defining their state:
 # - pos -> 2
@@ -23,10 +24,24 @@ class PhysicialProcessor(nn.Module):
                 nn.ELU(),
                 nn.Linear(config["hidden_size"], 256)
             )
+        
+        # Perform pooling along the number of entities in that particular batch
+        # Given that it can change across different worlds, this makes the physical features all equal
+        self.softmax_pooling = SoftmaxPooling(dim=1) 
 
     def forward(self, x):
-        if x.shape[-1] == 10: # if it is an agent
-            return self.agent_physical_processor(x)
+
+        batch, num, dim = x.shape
+        x = x.reshape(batch * num, dim)
+
+        if dim == 10: # if it is an agent
+            x = self.agent_physical_processor(x)
         else: # If it is a landmark
-            return self.landmark_physical_processor(x)
+            x = self.landmark_physical_processor(x)
+
+        x = x.reshape(batch, num, dim)
+
+        # shape: (batch, dim)
+        x = self.softmax_pooling(x)
+        return x
         

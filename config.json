@@ -15,6 +15,7 @@
         
         "timesteps": 100
     },
+
     "physical_processor":{
         "hidden_size": 256
     }
