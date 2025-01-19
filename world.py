@@ -4,9 +4,9 @@ from typing import List
 from agent import Agent
 
 import torch
-import random
+import torch.nn as nn
 
-class World:
+class World(nn.Module):
     def __init__(self, config: dict):
 
         self.height = config["height"]
@@ -16,6 +16,7 @@ class World:
         self.num_shapes = config["num_shapes"]
         self.batch_size = config["batch_size"]
         self.memory_size = config["memory_size"]
+        self.timesteps = config["timesteps"]
 
         #create all of the agents and put them in a tensor
         # shape: (batch_size, num_agents, 7)
@@ -65,7 +66,12 @@ class World:
 
         observation = {
             "physical_state": {"agents": all_agents, "landmarks": all_landmarks},
-            "communication": self.communication,
+            "communication": self.communication.clone(),
             "private_info": {"goal": private_goal, "memory": private_memory},
         }
         return observation
+    
+    def forward(self):
+        for timestep in self.timesteps:
+            for agent_idx in range(self.num_agents):
+                observation = self.get_observation(agent_idx)

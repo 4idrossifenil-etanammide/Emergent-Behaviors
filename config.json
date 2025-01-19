@@ -11,6 +11,8 @@
         "num_colors": 5,
         "num_shapes": 5,
 
-        "memory_size": 32
+        "memory_size": 32,
+        
+        "timesteps": 100
     }
 }
