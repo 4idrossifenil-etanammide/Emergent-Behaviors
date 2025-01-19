@@ -55,19 +55,15 @@ class World(nn.Module):
         goal_target = torch.randint(0, self.num_landmarks, (self.batch_size, self.num_agents, 1))
         return torch.cat((goal_type, goal_target), dim=2)
     
-    def get_observation(self, agent_idx):
-        all_agents = self.agents.clone()  
-        all_landmarks = self.landmarks.clone()
-
+    def get_agent_observation(self, agent_idx):
         # Instead of selecting directly using agent_idx, we select 
         # using the agent_idx and agent_idx + 1 to avoid collapsing a dimension
         private_goal = self.goals[:, agent_idx:agent_idx + 1, :] 
         private_memory = self.memory[:, agent_idx:agent_idx + 1, :]  
 
         observation = {
-            "physical_state": {"agents": all_agents, "landmarks": all_landmarks},
-            "communication": self.communication.clone(),
-            "private_info": {"goal": private_goal, "memory": private_memory},
+            "goal": private_goal,
+            "memory": private_memory,
         }
         return observation
     
