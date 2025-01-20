@@ -78,7 +78,7 @@ class World(nn.Module):
             physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=1)
             physical_features = SoftmaxPooling(dim=1)(physical_features)
 
-            utterance_features, self.utterance_memory = self.utterance_processor(self.utterance, self.utterance_memory)
+            utterance_features, self.utterance_memory, goal_pred = self.utterance_processor(self.utterance, self.utterance_memory)
             utterance_features = SoftmaxPooling(dim=1)(utterance_features)
 
             for agent_idx in range(self.num_agents):
