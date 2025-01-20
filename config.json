@@ -18,6 +18,11 @@
 
     "physical_processor":{
         "hidden_size": 256
+    },
+
+    "utterance_processor":{
+        "vocab_size": 10,
+        "embedding_size": 64
     }
 
 }

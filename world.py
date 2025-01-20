@@ -1,4 +1,5 @@
 from physical_processor import PhysicalProcessor
+from utterance_processor import UtteranceProcessor
 from softmax_pooling import SoftmaxPooling
 
 import torch
@@ -27,11 +28,13 @@ class World(nn.Module):
         # shape: (batch_size, num_agents, 2)
         self.goals = self.assign_goals()
         
-        self.communication = torch.zeros((self.batch_size, self.num_agents, 1))
+        self.utterance = torch.zeros((self.batch_size, self.num_agents, 1))
 
-        self.memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
+        self.utterance_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
+        self.final_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
 
         self.physical_processor = PhysicalProcessor(config["physical_processor"])
+        self.utterance_processor = UtteranceProcessor(config["utterance_processor"], self.memory_size)
 
         
 
@@ -80,6 +83,9 @@ class World(nn.Module):
             landmark_physical_features = self.physical_processor(self.landmarks)
             physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=1)
             physical_features = SoftmaxPooling(dim=1)(physical_features)
+
+            utterance_features, self.utterance_memory = self.utterance_processor(self.utterance, self.utterance_memory)
+            utterance_features = SoftmaxPooling(dim=1)(utterance_features)
 
             for agent_idx in range(self.num_agents):
                 return
