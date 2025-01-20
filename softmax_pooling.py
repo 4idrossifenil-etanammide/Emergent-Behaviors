@@ -7,6 +7,7 @@ class SoftmaxPooling(nn.Module):
     def __init__(self, dim, temperature = 1.0):
         super(SoftmaxPooling, self).__init__()
         self.dim = dim
+        self.temperature = temperature
 
     def forward(self, x):
         weights = F.softmax(x / self.temperature, dim=self.dim)

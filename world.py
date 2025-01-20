@@ -1,13 +1,12 @@
-from typing import Tuple
-from typing import List
-
-from physical_processor import PhysicialProcessor
+from physical_processor import PhysicalProcessor
+from softmax_pooling import SoftmaxPooling
 
 import torch
 import torch.nn as nn
 
 class World(nn.Module):
     def __init__(self, config: dict):
+        super(World, self).__init__()
 
         world_config = config["world"]
 
@@ -32,7 +31,7 @@ class World(nn.Module):
 
         self.memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
 
-        self.physical_processor = PhysicialProcessor(config["physical_processor"])
+        self.physical_processor = PhysicalProcessor(config["physical_processor"])
 
         
 
@@ -74,11 +73,13 @@ class World(nn.Module):
         return observation
     
     def forward(self):
-        for timestep in self.timesteps:
+        for timestep in range(self.timesteps):
             #Given that from Figure 3 in the paper the physical features
             #seems to be extracted once for all the agents, I'm doing the same here
             agent_physical_features = self.physical_processor(self.agents)
             landmark_physical_features = self.physical_processor(self.landmarks)
-            physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=0)
+            physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=1)
+            physical_features = SoftmaxPooling(dim=1)(physical_features)
+
             for agent_idx in range(self.num_agents):
-                observation = self.get_observation(agent_idx)
+                return

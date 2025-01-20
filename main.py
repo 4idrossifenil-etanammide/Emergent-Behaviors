@@ -1,6 +1,4 @@
 from world import World
-from physical_processor import Agent
-
 
 import random
 import json
@@ -14,6 +12,8 @@ def main():
     config = load_config()
 
     world = World(config) 
+
+    world()
 
 if __name__ == "__main__":
     main()
