@@ -68,6 +68,8 @@ class World(nn.Module):
         return torch.cat((goal_type, goal_target), dim=2)
     
     def forward(self):
+        delta_t = 0.1
+        damping = 0.5
         for timestep in range(self.timesteps):
             #Given that from Figure 3 in the paper the physical features
             #seems to be extracted once for all the agents, I'm doing the same here
@@ -86,3 +88,9 @@ class World(nn.Module):
                 v, gaze, utterance, new_memory = self.action_processor(private_goal, private_memory, physical_features, utterance_features)
 
                 self.final_memory[:, agent_idx, :] = new_memory
+                self.utterance[:, agent_idx, :] = utterance
+
+                # Transition dynamics
+                self.agents[:, agent_idx, :2] += v * delta_t # Position
+                self.agents[:, agent_idx, 2:4] = self.agents[:, agent_idx, 2:4] * damping + v * delta_t # Velocity
+                self.agents[:, agent_idx, 4:6] = gaze # Gaze
