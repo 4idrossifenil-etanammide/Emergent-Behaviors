@@ -1,12 +1,18 @@
 import torch.nn as nn
 
 class UtteranceProcessor(nn.Module):
-    def __init__(self, config, memory_size):
+    def __init__(self, config, memory_size, vocab_size):
         super(UtteranceProcessor, self).__init__()
-        self.vocab_size = config["vocab_size"]
+        self.vocab_size = vocab_size
         self.embedding_size = config["embedding_size"]
 
-        self.embedding = nn.Embedding(self.vocab_size, self.embedding_size)
+        self.embedding = nn.Sequential(
+            nn.Linear(vocab_size, 256),
+            nn.ELU(),
+            nn.Dropout(0.1),
+            nn.Linear(256, self.embedding_size)
+        )
+        
         self.cell = nn.GRUCell(self.embedding_size, memory_size)
 
         self.linear = nn.Sequential(
@@ -20,7 +26,7 @@ class UtteranceProcessor(nn.Module):
         x_batch, x_num, x_dim = x.shape
 
         x = x.reshape(x_batch * x_num, x_dim)
-        x = self.embedding(x.long()).squeeze()
+        x = self.embedding(x)
 
         mem_batch, mem_num, mem_dim = mem.shape
         mem = mem.reshape(mem_batch * mem_num, mem_dim)

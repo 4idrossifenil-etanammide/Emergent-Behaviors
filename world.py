@@ -1,6 +1,7 @@
 from physical_processor import PhysicalProcessor
 from utterance_processor import UtteranceProcessor
 from softmax_pooling import SoftmaxPooling
+from action_processor import ActionProcessor
 
 import torch
 import torch.nn as nn
@@ -19,6 +20,7 @@ class World(nn.Module):
         self.batch_size = world_config["batch_size"]
         self.memory_size = world_config["memory_size"]
         self.timesteps = world_config["timesteps"]
+        self.vocab_size = world_config["vocab_size"]
 
         #create all of the agents and put them in a tensor
         # shape: (batch_size, num_agents, 10)
@@ -28,13 +30,14 @@ class World(nn.Module):
         # shape: (batch_size, num_agents, 2)
         self.goals = self.assign_goals()
         
-        self.utterance = torch.zeros((self.batch_size, self.num_agents, 1))
+        self.utterance = torch.zeros((self.batch_size, self.num_agents, self.vocab_size))
 
         self.utterance_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
         self.final_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
 
         self.physical_processor = PhysicalProcessor(config["physical_processor"])
-        self.utterance_processor = UtteranceProcessor(config["utterance_processor"], self.memory_size)
+        self.utterance_processor = UtteranceProcessor(config["utterance_processor"], self.memory_size, self.vocab_size)
+        self.action_processor = ActionProcessor(config["action_processor"], self.memory_size, self.num_landmarks, self.vocab_size)
 
         
 
@@ -77,5 +80,5 @@ class World(nn.Module):
             utterance_features = SoftmaxPooling(dim=1)(utterance_features)
 
             for agent_idx in range(self.num_agents):
-                private_goal = self.goals[:, agent_idx:agent_idx + 1, :] 
-                private_memory = self.final_memory[:, agent_idx:agent_idx + 1, :]
+                private_goal = self.goals[:, agent_idx, :] 
+                private_memory = self.final_memory[:, agent_idx, :]
