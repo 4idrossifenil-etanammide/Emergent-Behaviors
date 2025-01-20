@@ -58,6 +58,7 @@ class World(nn.Module):
         landmarks = torch.cat((pos, color, shapes), dim=2)
         return landmarks
 
+    #TODO Check if the goals are not contradicting each other
     def assign_goals(self):
         goal_type = torch.randint(0, 3, (self.batch_size, self.num_agents, 1)) # 0 do nothing, 1 look at landmark, 2 move to landmark
         goal_target = torch.randint(0, self.num_landmarks, (self.batch_size, self.num_agents, 1))
