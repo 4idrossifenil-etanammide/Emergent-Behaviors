@@ -40,11 +40,11 @@ class ActionProcessor(nn.Module):
             nn.Linear(256, self.vocab_size)
         )
 
-        self.cell = nn.GRUCell(self.embedding_size * 3, memory_size)      
+        self.cell = nn.GRUCell(64 + 256 + 32, memory_size) # TODO: Change those ugly hardcoded values
 
     def forward(self, goal, memory, physical_features, utterance_features):
 
-        goal = self.goal_embedding(goal) # From (batch, 2) to (batch, embedding_size)
+        goal = self.goal_embedding(goal.float()) # From (batch, 2) to (batch, embedding_size)
 
         x = torch.cat((goal, physical_features, utterance_features), dim=1)
 

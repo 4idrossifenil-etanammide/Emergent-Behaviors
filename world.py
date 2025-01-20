@@ -82,3 +82,7 @@ class World(nn.Module):
             for agent_idx in range(self.num_agents):
                 private_goal = self.goals[:, agent_idx, :] 
                 private_memory = self.final_memory[:, agent_idx, :]
+
+                v, gaze, utterance, new_memory = self.action_processor(private_goal, private_memory, physical_features, utterance_features)
+
+                self.final_memory[:, agent_idx, :] = new_memory
