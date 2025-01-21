@@ -165,5 +165,5 @@ class World(nn.Module):
         #Note: this has to be maximized, so subtract it?
         utterance_cost = (symbol_counts * log_probs).sum()
 
-        return near_cost + prediction_cost + utterance_cost
+        return near_cost + prediction_cost - utterance_cost
 

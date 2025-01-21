@@ -13,7 +13,8 @@ def main():
 
     world = World(config) 
 
-    world()
+    cost = world()
+    print(cost)
 
 if __name__ == "__main__":
     main()
