@@ -15,7 +15,7 @@
         
         "timesteps": 100,
 
-        "vocab_size": 10,
+        "vocab_size": 50,
 
         "delta_t": 0.1,
         "damping": 0.5
@@ -26,12 +26,17 @@
     },
 
     "utterance_processor":{
-        "embedding_size": 64
+        "embedding_size": 64,
+        "hidden_size": 256,
+        "feature_size": 256
     },
 
     "action_processor": {
         "actions": 3,
-        "embedding_size": 64
+        "goal_size": 4,
+        "embedding_size": 64,
+        "hidden_size": 256,
+        "feature_size": 256
     }
 
 }

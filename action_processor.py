@@ -7,16 +7,18 @@ class ActionProcessor(nn.Module):
         super(ActionProcessor, self).__init__()
         self.actions = config["actions"]
         self.embedding_size = config["embedding_size"]
+        self.feature_size = config["feature_size"]
+        self.hidden_size = config["hidden_size"]
+        self.goal_size = config["goal_size"]
         self.memory_size = memory_size
         self.num_landmarks = num_landmarks
         self.vocab_size = vocab_size
 
-        #TODO reduce size of embedding
         self.goal_embedding = nn.Sequential(
-            nn.Linear(4, 256),
+            nn.Linear(self.goal_size, self.hidden_size),
             nn.ELU(),
             nn.Dropout(0.1),
-            nn.Linear(256, self.embedding_size)
+            nn.Linear(self.hidden_size, self.embedding_size)
         )
 
         # TODO: To avoid too big value as velocity and gaze, we should use tanh as activation function
@@ -42,7 +44,7 @@ class ActionProcessor(nn.Module):
             nn.Linear(256, self.vocab_size)
         )
 
-        self.cell = nn.GRUCell(64 + 256 + 32, memory_size) # TODO: Change those ugly hardcoded values
+        self.cell = nn.GRUCell(self.embedding_size + 2 * self.feature_size, memory_size) # TODO: Change those ugly hardcoded values
 
     def forward(self, goal, memory, physical_features, utterance_features):
 

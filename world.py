@@ -39,7 +39,8 @@ class World(nn.Module):
 
         self.utterance_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
 
-        #WHY final? shouldn't it be the same memory it was before?
+        #WHY final? shouldn't it be the same memory it was before? the same memory should 
+        #be used both by FC for utterances and FC for action
         self.final_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
 
         self.physical_processor = PhysicalProcessor(config["physical_processor"])
@@ -81,7 +82,6 @@ class World(nn.Module):
             velocity = torch.zeros((self.batch_size, self.num_landmarks, 2))
             gaze = torch.tensor([-1,-1]).repeat(self.batch_size, self.num_landmarks, 1)
             landmarks = torch.cat((pos, velocity, gaze, color, shapes), dim=2)
-            print(landmarks.shape)
             return landmarks
         
         landmarks = torch.cat((pos, color, shapes), dim=2)
