@@ -55,7 +55,7 @@ class ActionProcessor(nn.Module):
         y_soft = F.softmax(y / temperature, dim=-1)
 
         _, max_indices = y_soft.max(dim=-1, keepdim=True)
-        y_hard = torch.zeros_like(y_soft).scatter_(-1, max_indices, 1.0)
+        y_hard = torch.zeros_like(y_soft).scatter(-1, max_indices, 1.0)
         y_hard = (y_hard - y_soft).detach() + y_soft
         return y_hard
 

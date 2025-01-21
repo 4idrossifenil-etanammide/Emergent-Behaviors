@@ -9,7 +9,7 @@ import torch.nn as nn
 import random
 
 class World(nn.Module):
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, device):
         super(World, self).__init__()
 
         world_config = config["world"]
@@ -22,32 +22,26 @@ class World(nn.Module):
         self.batch_size = world_config["batch_size"]
         self.memory_size = world_config["memory_size"]
         self.timesteps = world_config["timesteps"]
-        self.timesteps=1
         self.vocab_size = world_config["vocab_size"]
         self.delta_t= world_config["delta_t"]
         self.damping = world_config["damping"]
 
-        #create all of the agents and put them in a tensor
+        self.device = device
+
+        self.physical_processor = PhysicalProcessor(config["physical_processor"]).to(self.device)
+        self.utterance_processor = UtteranceProcessor(config["utterance_processor"], self.memory_size, self.vocab_size, self.num_agents).to(self.device)
+        self.action_processor = ActionProcessor(config["action_processor"], self.memory_size, self.num_landmarks, self.vocab_size).to(self.device)
+
+    def reset(self):
         # shape: (batch_size, num_agents, 10)
-        self.agents = self.create_agents_batch()
+        self.agents = self.create_agents_batch().to(self.device)
         # shape: (batch_size, num_landmarks, 6) or (batch_size, num_landmarks, 10) 
-        self.landmarks = self.create_landmarks_batch()
+        self.landmarks = self.create_landmarks_batch().to(self.device)
         # shape: (batch_size, num_agents, 2)
-        self.goals = self.assign_goals()
-        
-        self.utterance = torch.zeros((self.batch_size, self.num_agents, self.vocab_size))
-
-        self.utterance_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
-
-        #WHY final? shouldn't it be the same memory it was before? the same memory should 
-        #be used both by FC for utterances and FC for action
-        self.final_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
-
-        self.physical_processor = PhysicalProcessor(config["physical_processor"])
-        self.utterance_processor = UtteranceProcessor(config["utterance_processor"], self.memory_size, self.vocab_size, self.num_agents)
-        self.action_processor = ActionProcessor(config["action_processor"], self.memory_size, self.num_landmarks, self.vocab_size)
-
-        
+        self.goals = self.assign_goals().to(self.device)
+        self.utterance = torch.zeros((self.batch_size, self.num_agents, self.vocab_size)).to(self.device)
+        self.utterance_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size)).to(self.device)
+        self.final_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size)).to(self.device)
 
     # creates an batch_size*num_agents agents, giving them:
     # Random position: (width, width)
@@ -133,19 +127,28 @@ class World(nn.Module):
 
                 v, gaze, utterance, new_memory = self.action_processor(private_goal, private_memory, physical_features, utterance_features)
 
-                self.final_memory[:, agent_idx, :] = new_memory
-                self.utterance[:, agent_idx, :] = utterance
+                #print("DEBUG")
+
+                updated_final_memory = self.final_memory.clone()
+                updated_final_memory[:, agent_idx, :] = new_memory
+                self.final_memory = updated_final_memory
+
+                updated_utterance = self.utterance.clone()
+                updated_utterance[:, agent_idx, :] = utterance
+                self.utterance = updated_utterance
 
                 # Transition dynamics
-                self.agents[:, agent_idx, :2] += v * self.delta_t # Position
-                self.agents[:, agent_idx, 2:4] = self.agents[:, agent_idx, 2:4] * self.damping + v * self.delta_t # Velocity
-                self.agents[:, agent_idx, 4:6] = gaze # Gaze
+                updated_agents = self.agents.clone()
+                updated_agents[:, agent_idx, :2] = updated_agents[:, agent_idx, :2] + v * self.delta_t  # Position
+                updated_agents[:, agent_idx, 2:4] = updated_agents[:, agent_idx, 2:4] * self.damping + v * self.delta_t  # Velocity
+                updated_agents[:, agent_idx, 4:6] = gaze  # Gaze
+                self.agents = updated_agents
 
             cost = self.compute_cost(goal_pred)
             total_cost += cost
             #print("cost: ", cost)
 
-        return total_cost
+        return total_cost 
 
     #Computes the cost, by summing the joint goal distance, the auxiliary prediction cost
     # and the 
@@ -162,7 +165,6 @@ class World(nn.Module):
         probs = symbol_counts / (0.1 + total_count - 1) # 0.1 should be alpha. What's the correct value? TODO
         log_probs = torch.log(probs + 1e-10)
 
-        #Note: this has to be maximized, so subtract it?
         utterance_cost = (symbol_counts * log_probs).sum()
 
         return near_cost + prediction_cost - utterance_cost
