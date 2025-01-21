@@ -115,10 +115,11 @@ class World(nn.Module):
                 self.agents[:, agent_idx, 2:4] = self.agents[:, agent_idx, 2:4] * damping + v * delta_t # Velocity
                 self.agents[:, agent_idx, 4:6] = gaze # Gaze
 
-            cost = self.compute_cost()
+            cost = self.compute_cost(goal_pred)
             total_cost += cost
 
         return total_cost
 
-    def compute_cost(self):
-        return 0
+    def compute_cost(self, goal_pred):
+        near_cost = torch.norm(self.agents[:, :, :2] - self.goals[:, :, 2:], dim=2).sum()
+        prediction_cost = torch.norm(self.goals - goal_pred).sum()
