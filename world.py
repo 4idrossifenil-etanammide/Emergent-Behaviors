@@ -6,6 +6,8 @@ from action_processor import ActionProcessor
 import torch
 import torch.nn as nn
 
+import random
+
 class World(nn.Module):
     def __init__(self, config: dict):
         super(World, self).__init__()
@@ -36,7 +38,7 @@ class World(nn.Module):
         self.final_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
 
         self.physical_processor = PhysicalProcessor(config["physical_processor"])
-        self.utterance_processor = UtteranceProcessor(config["utterance_processor"], self.memory_size, self.vocab_size)
+        self.utterance_processor = UtteranceProcessor(config["utterance_processor"], self.memory_size, self.vocab_size, self.num_agents)
         self.action_processor = ActionProcessor(config["action_processor"], self.memory_size, self.num_landmarks, self.vocab_size)
 
         
@@ -63,9 +65,25 @@ class World(nn.Module):
 
     #TODO Check if the goals are not contradicting each other
     def assign_goals(self):
-        goal_type = torch.randint(0, 3, (self.batch_size, self.num_agents, 1)) # 0 do nothing, 1 look at landmark, 2 move to landmark
-        goal_target = torch.randint(0, self.num_landmarks, (self.batch_size, self.num_agents, 1))
-        return torch.cat((goal_type, goal_target), dim=2)
+        goals = torch.zeros((self.batch_size, self.num_agents, 4))
+        for b in range(self.batch_size):
+            agents_to_assing = set([i for i in range(self.num_agents)])
+            landmarks_to_assing = set([i for i in range(self.num_landmarks)])
+            for agent in range(self.num_agents):
+                goal_type = random.choice([0,1,2]) # 0: do nothing, 1: go to, 2: look at
+
+                target_agent = random.sample(agents_to_assing, 1)[0]
+                agents_to_assing.remove(target_agent)
+
+                if goal_type == 0:
+                    pos_x, pos_y = self.agents[b, target_agent, :2]
+                else:
+                    target_landmark = random.sample(landmarks_to_assing, 1)[0] # Multiple agents can have same landmark as objective, so we don't remove it from the set
+                    pos_x, pos_y = self.landmarks[b, target_landmark, :2]
+
+                goals[b, agent, :] = torch.tensor([goal_type, target_agent, pos_x, pos_y])
+
+        return goals
     
     def forward(self):
         delta_t = 0.1

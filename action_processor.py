@@ -12,7 +12,7 @@ class ActionProcessor(nn.Module):
         self.vocab_size = vocab_size
 
         self.goal_embedding = nn.Sequential(
-            nn.Linear(2, 256),
+            nn.Linear(4, 256),
             nn.ELU(),
             nn.Dropout(0.1),
             nn.Linear(256, self.embedding_size)
@@ -44,7 +44,7 @@ class ActionProcessor(nn.Module):
 
     def forward(self, goal, memory, physical_features, utterance_features):
 
-        goal = self.goal_embedding(goal.float()) # From (batch, 2) to (batch, embedding_size)
+        goal = self.goal_embedding(goal.float()) # From (batch, 4) to (batch, embedding_size)
 
         x = torch.cat((goal, physical_features, utterance_features), dim=1)
 
