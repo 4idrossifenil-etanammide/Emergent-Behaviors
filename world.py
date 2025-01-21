@@ -30,7 +30,7 @@ class World(nn.Module):
         #create all of the agents and put them in a tensor
         # shape: (batch_size, num_agents, 10)
         self.agents = self.create_agents_batch()
-        # shape: (batch_size, num_landmarks, 6)
+        # shape: (batch_size, num_landmarks, 6) or (batch_size, num_landmarks, 10) 
         self.landmarks = self.create_landmarks_batch()
         # shape: (batch_size, num_agents, 2)
         self.goals = self.assign_goals()
@@ -69,11 +69,21 @@ class World(nn.Module):
     # Random position: (width, width)
     # Random color: (255,255,255)
     # Random shape: (num_shapes)
-    def create_landmarks_batch(self):
+    # if dummyValues is true, also gives them:
+    # Zero velocity: (0,0)
+    # negative gaze: (-1,-1)
+    def create_landmarks_batch(self, dummyValues = True):
         pos = torch.randint(0, self.width, (self.batch_size, self.num_landmarks, 2))
         color = torch.randint(0, 256, (self.batch_size, self.num_landmarks, 3))
         shapes = torch.randint(0, self.num_shapes, (self.batch_size, self.num_landmarks, 1))
 
+        if dummyValues:
+            velocity = torch.zeros((self.batch_size, self.num_landmarks, 2))
+            gaze = torch.tensor([-1,-1]).repeat(self.batch_size, self.num_landmarks, 1)
+            landmarks = torch.cat((pos, velocity, gaze, color, shapes), dim=2)
+            print(landmarks.shape)
+            return landmarks
+        
         landmarks = torch.cat((pos, color, shapes), dim=2)
         return landmarks
 
@@ -137,18 +147,22 @@ class World(nn.Module):
 
         return total_cost
 
+    #Computes the cost, by summing the joint goal distance, the auxiliary prediction cost
+    # and the 
     def compute_cost(self, goal_pred):
         #TODO: fix this to correctly pair agents and goal.
         #Missing check for which goal has to be done (go to? look at?)
         near_cost = torch.norm(self.agents[:, :, :2] - self.goals[:, :, 2:], dim=2).sum()
         prediction_cost = torch.norm(goal_pred - self.goals).sum()
 
+        #shouldn't symbols be counted also for previous iterations?
         symbol_counts = self.utterance.sum(dim=(0, 1))  # shape: (vocab_size)
         total_count = symbol_counts.sum()
 
         probs = symbol_counts / (0.1 + total_count - 1) # 0.1 should be alpha. What's the correct value? TODO
         log_probs = torch.log(probs + 1e-10)
 
+        #Note: this has to be maximized, so subtract it?
         utterance_cost = (symbol_counts * log_probs).sum()
 
         return near_cost + prediction_cost + utterance_cost
