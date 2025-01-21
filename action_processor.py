@@ -11,6 +11,7 @@ class ActionProcessor(nn.Module):
         self.hidden_size = config["hidden_size"]
         self.goal_size = config["goal_size"]
         self.memory_size = memory_size
+        self.action_decoder_input = self.embedding_size + 2 * self.feature_size + self.memory_size
         self.num_landmarks = num_landmarks
         self.vocab_size = vocab_size
 
@@ -22,26 +23,11 @@ class ActionProcessor(nn.Module):
         )
 
         # TODO: To avoid too big value as velocity and gaze, we should use tanh as activation function
-        #TODO: unify actions into single network
-        self.velocity_decoder = nn.Sequential(
-            nn.Linear(memory_size, 256),
+        self.action_decoder = nn.Sequential(
+            nn.Linear(self.action_decoder_input, self.hidden_size),
             nn.ELU(),
             nn.Dropout(0.1),
-            nn.Linear(256, 2)
-        )
-
-        self.gaze_decoder = nn.Sequential(
-            nn.Linear(memory_size, 256),
-            nn.ELU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, 2)
-        )
-
-        self.utterance_decoder = nn.Sequential(
-            nn.Linear(memory_size, 256),
-            nn.ELU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, self.vocab_size)
+            nn.Linear(self.hidden_size, 2+2+self.vocab_size)
         )
 
         self.cell = nn.GRUCell(self.embedding_size + 2 * self.feature_size, memory_size) # TODO: Change those ugly hardcoded values
@@ -50,16 +36,17 @@ class ActionProcessor(nn.Module):
 
         goal = self.goal_embedding(goal.float()) # From (batch, 4) to (batch, embedding_size)
 
-        x = torch.cat((goal, physical_features, utterance_features), dim=1)
+        x = torch.cat((goal, physical_features, utterance_features), dim=-1)
 
         new_memory = self.cell(x, memory)
 
-        v = self.velocity_decoder(new_memory)
-        gaze = self.gaze_decoder(new_memory)
-        utterance_logits = self.utterance_decoder(new_memory)
+        action = self.action_decoder(torch.cat((x, new_memory), dim =-1))
+        velocity = action[..., :2]
+        gaze = action[..., 2:4]
+        utterance_logits = action[..., 4:]
         utterance = self.gumbel_softmax(utterance_logits)
 
-        return v, gaze, utterance, new_memory
+        return velocity, gaze, utterance, new_memory
 
     def gumbel_softmax(self, logits, temperature = 1.0):
 

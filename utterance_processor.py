@@ -47,6 +47,7 @@ class UtteranceProcessor(nn.Module):
 
         new_mem = self.cell(x, mem)
 
+        #FIrst i would compute this, and THEN update the memory
         new_x = self.linear(torch.cat((x, new_mem), dim=1))
 
         new_mem = new_mem.reshape(mem_batch, mem_num, -1)
