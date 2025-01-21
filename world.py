@@ -88,7 +88,9 @@ class World(nn.Module):
     def forward(self):
         delta_t = 0.1
         damping = 0.5
-        for timestep in range(self.timesteps):
+
+        total_cost = 0
+        for _ in range(self.timesteps):
             #Given that from Figure 3 in the paper the physical features
             #seems to be extracted once for all the agents, I'm doing the same here
             agent_physical_features = self.physical_processor(self.agents)
@@ -112,3 +114,11 @@ class World(nn.Module):
                 self.agents[:, agent_idx, :2] += v * delta_t # Position
                 self.agents[:, agent_idx, 2:4] = self.agents[:, agent_idx, 2:4] * damping + v * delta_t # Velocity
                 self.agents[:, agent_idx, 4:6] = gaze # Gaze
+
+            cost = self.compute_cost()
+            total_cost += cost
+
+        return total_cost
+
+    def compute_cost(self):
+        return 0
