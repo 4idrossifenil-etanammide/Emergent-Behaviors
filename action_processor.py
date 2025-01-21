@@ -63,7 +63,6 @@ class ActionProcessor(nn.Module):
         y = logits + gumbel_noise
         y_soft = F.softmax(y / temperature, dim=-1)
 
-        shape = y_soft.size()
         _, max_indices = y_soft.max(dim=-1, keepdim=True)
         y_hard = torch.zeros_like(y_soft).scatter_(-1, max_indices, 1.0)
         y_hard = (y_hard - y_soft).detach() + y_soft

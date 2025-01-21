@@ -123,3 +123,14 @@ class World(nn.Module):
     def compute_cost(self, goal_pred):
         near_cost = torch.norm(self.agents[:, :, :2] - self.goals[:, :, 2:], dim=2).sum()
         prediction_cost = torch.norm(self.goals - goal_pred).sum()
+
+        symbol_counts = self.utterances.sum(dim=(0, 1))  # shape: (vocab_size)
+        total_count = symbol_counts.sum()
+
+        probs = symbol_counts / (0.1 + total_count - 1) # 0.1 should be alpha. What's the correct value? TODO
+        log_probs = torch.log(probs + 1e-10)
+
+        utterance_cost = (symbol_counts * log_probs).sum()
+
+        return near_cost + prediction_cost + utterance_cost
+
