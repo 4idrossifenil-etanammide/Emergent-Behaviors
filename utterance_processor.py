@@ -17,6 +17,7 @@ class UtteranceProcessor(nn.Module):
 
         self.cell = nn.GRUCell(self.embedding_size, memory_size)
 
+        #TODO fix input size
         self.linear = nn.Sequential(
             nn.Linear(memory_size, memory_size),
             nn.ELU(),
@@ -24,6 +25,7 @@ class UtteranceProcessor(nn.Module):
             nn.Linear(memory_size, memory_size)
         )
 
+        #TODO unify the goals and take as input utterance representation and memory
         self.goal_predictor = nn.Sequential(
             nn.Linear(memory_size, 256),
             nn.ELU(),

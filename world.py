@@ -22,7 +22,10 @@ class World(nn.Module):
         self.batch_size = world_config["batch_size"]
         self.memory_size = world_config["memory_size"]
         self.timesteps = world_config["timesteps"]
+        self.timesteps=1
         self.vocab_size = world_config["vocab_size"]
+        self.delta_t= world_config["delta_t"]
+        self.damping = world_config["damping"]
 
         #create all of the agents and put them in a tensor
         # shape: (batch_size, num_agents, 10)
@@ -35,6 +38,8 @@ class World(nn.Module):
         self.utterance = torch.zeros((self.batch_size, self.num_agents, self.vocab_size))
 
         self.utterance_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
+
+        #WHY final? shouldn't it be the same memory it was before?
         self.final_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size))
 
         self.physical_processor = PhysicalProcessor(config["physical_processor"])
@@ -43,9 +48,14 @@ class World(nn.Module):
 
         
 
-    #creates an agent, giving it a random position, a random color, a random gaze and
-    # a velocity of 0
+    # creates an batch_size*num_agents agents, giving them:
+    # Random position: (width, width)
+    # Zero velocity: (0,0)
+    # Random gaze: (width,width)
+    # Random color: (255,255,255)
+    # Random shape: (num_shapes)
     def create_agents_batch(self):
+
         pos = torch.randint(0, self.width, (self.batch_size, self.num_agents, 2))
         velocity = torch.zeros((self.batch_size, self.num_agents, 2))
         gaze = torch.randint(0, self.width, (self.batch_size, self.num_agents, 2))
@@ -55,6 +65,10 @@ class World(nn.Module):
         agents = torch.cat((pos, velocity, gaze, color, shape), dim=2)
         return agents
     
+    # creates an batch_size*num_landmarks landmarks, giving them:
+    # Random position: (width, width)
+    # Random color: (255,255,255)
+    # Random shape: (num_shapes)
     def create_landmarks_batch(self):
         pos = torch.randint(0, self.width, (self.batch_size, self.num_landmarks, 2))
         color = torch.randint(0, 256, (self.batch_size, self.num_landmarks, 3))
@@ -63,22 +77,23 @@ class World(nn.Module):
         landmarks = torch.cat((pos, color, shapes), dim=2)
         return landmarks
 
+    #Assign goals to the agent such that goals are not contradicting.
     #TODO Check if the goals are not contradicting each other
     def assign_goals(self):
         goals = torch.zeros((self.batch_size, self.num_agents, 4))
         for b in range(self.batch_size):
-            agents_to_assing = set([i for i in range(self.num_agents)])
-            landmarks_to_assing = set([i for i in range(self.num_landmarks)])
+            agents_to_assign = set([i for i in range(self.num_agents)])
+            landmarks_to_assign = set([i for i in range(self.num_landmarks)])
             for agent in range(self.num_agents):
                 goal_type = random.choice([0,1,2]) # 0: do nothing, 1: go to, 2: look at
 
-                target_agent = random.sample(agents_to_assing, 1)[0]
-                agents_to_assing.remove(target_agent)
+                target_agent = random.sample(sorted(agents_to_assign), 1)[0]
+                agents_to_assign.remove(target_agent)
 
                 if goal_type == 0:
                     pos_x, pos_y = self.agents[b, target_agent, :2]
                 else:
-                    target_landmark = random.sample(landmarks_to_assing, 1)[0] # Multiple agents can have same landmark as objective, so we don't remove it from the set
+                    target_landmark = random.sample(sorted(landmarks_to_assign), 1)[0] # Multiple agents can have same landmark as objective, so we don't remove it from the set
                     pos_x, pos_y = self.landmarks[b, target_landmark, :2]
 
                 goals[b, agent, :] = torch.tensor([goal_type, target_agent, pos_x, pos_y])
@@ -86,8 +101,6 @@ class World(nn.Module):
         return goals
     
     def forward(self):
-        delta_t = 0.1
-        damping = 0.5
 
         total_cost = 0
         for _ in range(self.timesteps):
@@ -101,6 +114,9 @@ class World(nn.Module):
             utterance_features, self.utterance_memory, goal_pred = self.utterance_processor(self.utterance, self.utterance_memory)
             utterance_features = SoftmaxPooling(dim=1)(utterance_features)
 
+            #print("goal prediction shape: ", goal_pred.shape)
+
+            #is this necessary? might be ideal to do all of the agents at once?
             for agent_idx in range(self.num_agents):
                 private_goal = self.goals[:, agent_idx, :] 
                 private_memory = self.final_memory[:, agent_idx, :]
@@ -111,20 +127,23 @@ class World(nn.Module):
                 self.utterance[:, agent_idx, :] = utterance
 
                 # Transition dynamics
-                self.agents[:, agent_idx, :2] += v * delta_t # Position
-                self.agents[:, agent_idx, 2:4] = self.agents[:, agent_idx, 2:4] * damping + v * delta_t # Velocity
+                self.agents[:, agent_idx, :2] += v * self.delta_t # Position
+                self.agents[:, agent_idx, 2:4] = self.agents[:, agent_idx, 2:4] * self.damping + v * self.delta_t # Velocity
                 self.agents[:, agent_idx, 4:6] = gaze # Gaze
 
             cost = self.compute_cost(goal_pred)
             total_cost += cost
+            #print("cost: ", cost)
 
         return total_cost
 
     def compute_cost(self, goal_pred):
+        #TODO: fix this to correctly pair agents and goal.
+        #Missing check for which goal has to be done (go to? look at?)
         near_cost = torch.norm(self.agents[:, :, :2] - self.goals[:, :, 2:], dim=2).sum()
-        prediction_cost = torch.norm(self.goals - goal_pred).sum()
+        prediction_cost = torch.norm(goal_pred - self.goals).sum()
 
-        symbol_counts = self.utterances.sum(dim=(0, 1))  # shape: (vocab_size)
+        symbol_counts = self.utterance.sum(dim=(0, 1))  # shape: (vocab_size)
         total_count = symbol_counts.sum()
 
         probs = symbol_counts / (0.1 + total_count - 1) # 0.1 should be alpha. What's the correct value? TODO

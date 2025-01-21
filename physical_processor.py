@@ -24,6 +24,8 @@ class PhysicalProcessor(nn.Module):
                 nn.ELU(),
                 nn.Linear(config["hidden_size"], 256)
             )
+        
+        #>TODO seconda interpreatazione con rete unica
 
     def forward(self, x):
 

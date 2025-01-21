@@ -11,6 +11,7 @@ class ActionProcessor(nn.Module):
         self.num_landmarks = num_landmarks
         self.vocab_size = vocab_size
 
+        #TODO reduce size of embedding
         self.goal_embedding = nn.Sequential(
             nn.Linear(4, 256),
             nn.ELU(),
@@ -19,6 +20,7 @@ class ActionProcessor(nn.Module):
         )
 
         # TODO: To avoid too big value as velocity and gaze, we should use tanh as activation function
+        #TODO: unify actions into single network
         self.velocity_decoder = nn.Sequential(
             nn.Linear(memory_size, 256),
             nn.ELU(),

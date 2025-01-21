@@ -1,12 +1,12 @@
 {
     "world": {
-        "batch_size": 256,
+        "batch_size": 64,
 
         "height" : 600,
         "width" : 600,
 
-        "num_agents": 3,
-        "num_landmarks": 2,
+        "num_agents": 11,
+        "num_landmarks":12,
 
         "num_colors": 5,
         "num_shapes": 5,
@@ -15,7 +15,10 @@
         
         "timesteps": 100,
 
-        "vocab_size": 10
+        "vocab_size": 10,
+
+        "delta_t": 0.1,
+        "damping": 0.5
     },
 
     "physical_processor":{
