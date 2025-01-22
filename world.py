@@ -34,7 +34,8 @@ class World(nn.Module):
 
     def reset(self):
         # shape: (batch_size, num_agents, 10)
-        self.agents, self.radians = self.create_agents_batch().to(self.device)
+        self.agents, self.radians = self.create_agents_batch()
+        self.agents = self.agents.to(self.device)
         # shape: (batch_size, num_landmarks, 6) or (batch_size, num_landmarks, 10) 
         self.landmarks = self.create_landmarks_batch().to(self.device)
         # shape: (batch_size, num_agents, 2)
@@ -58,6 +59,7 @@ class World(nn.Module):
         color = torch.randint(0, 256, (self.batch_size, self.num_agents, 3))
         shape = torch.randint(0, self.num_shapes, (self.batch_size, self.num_agents, 1))
         radians = torch.rand((self.batch_size, self.num_agents, 1)) * 2 * torch.pi
+
 
         agents = torch.cat((pos, velocity, gaze, color, shape), dim=2)
         return agents, radians
@@ -107,8 +109,28 @@ class World(nn.Module):
         return goals
     
     def forward(self):
-
         total_cost = 0
+        history = {
+            "initial_agents": {
+                "positions": self.agents[:, :, :2].clone(),
+                "colors": self.agents[:, :, 6:9].clone(),
+                "shapes": self.agents[:, :, 9].clone(),
+                "gaze": self.agents[:, :, 4:6].clone()
+            },
+            "initial_landmarks": {
+                "positions": self.landmarks[:, :, :2].clone(),
+                "colors": self.landmarks[:, :, 6:9].clone(),
+                "shapes": self.landmarks[:, :, 9].clone()
+            },
+            "agents": [
+                {
+                    "positions": [],
+                    "gaze": [],
+                    "utterances": []
+                } for _ in range(self.num_agents)
+            ]
+        }
+
         for _ in range(self.timesteps):
             #Given that from Figure 3 in the paper the physical features
             #seems to be extracted once for all the agents, I'm doing the same here
@@ -146,11 +168,16 @@ class World(nn.Module):
                 updated_agents[:, agent_idx, 4:6] = gaze  # Gaze
                 self.agents = updated_agents
 
+                # Record history
+                history["agents"][agent_idx]["positions"].append(updated_agents[:, agent_idx, :2].clone())
+                history["agents"][agent_idx]["gaze"].append(gaze.clone())
+                history["agents"][agent_idx]["utterances"].append(utterance.clone())
+
             cost = self.compute_cost(goal_pred)
             total_cost += cost
             #print("cost: ", cost)
 
-        return total_cost 
+        return total_cost, history
 
     #Computes the cost, by summing the joint goal distance, the auxiliary prediction cost
     # and the 
