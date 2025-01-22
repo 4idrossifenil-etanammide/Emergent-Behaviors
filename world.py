@@ -34,7 +34,8 @@ class World(nn.Module):
 
     def reset(self):
         # shape: (batch_size, num_agents, 10)
-        self.agents, self.radians = self.create_agents_batch().to(self.device)
+        self.agents, self.radians = self.create_agents_batch()
+        self.agents = self.agents.to(self.device)
         # shape: (batch_size, num_landmarks, 6) or (batch_size, num_landmarks, 10) 
         self.landmarks = self.create_landmarks_batch().to(self.device)
         # shape: (batch_size, num_agents, 2)

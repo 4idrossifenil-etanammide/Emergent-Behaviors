@@ -28,9 +28,10 @@ def main(render=False):
         world.reset()
         optimizer.zero_grad()
         loss, history = world()
-        renderer.render(history)
-        break
-    
+
+        if render:
+            renderer.render(history)
+
         loss.backward()
         optimizer.step()
 
