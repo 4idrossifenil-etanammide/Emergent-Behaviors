@@ -18,13 +18,17 @@ class PhysicalProcessor(nn.Module):
                 nn.Linear(config["hidden_size"], 256)
             )
 
-    def forward(self, x):
+    def forward(self, x, rmatrix):
 
         batch, num, dim = x.shape
         x = x.reshape(batch * num, dim).float()
+
+        #rotate the positions and the gaze:
+        print(rmatrix.shape)
 
         x = self.physical_processor(x)
 
         x = x.reshape(batch, num, -1)
         return x
+    
         

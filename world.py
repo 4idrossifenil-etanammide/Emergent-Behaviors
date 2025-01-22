@@ -2,6 +2,7 @@ from physical_processor import PhysicalProcessor
 from utterance_processor import UtteranceProcessor
 from softmax_pooling import SoftmaxPooling
 from action_processor import ActionProcessor
+from math import cos, sin
 
 import torch
 import torch.nn as nn
@@ -34,7 +35,8 @@ class World(nn.Module):
 
     def reset(self):
         # shape: (batch_size, num_agents, 10)
-        self.agents, self.radians = self.create_agents_batch()
+        self.agents, self.rotation_matrices = self.create_agents_batch()
+        print(self.rotation_matrices.shape)
         self.agents = self.agents.to(self.device)
         # shape: (batch_size, num_landmarks, 6) or (batch_size, num_landmarks, 10) 
         self.landmarks = self.create_landmarks_batch().to(self.device)
@@ -50,7 +52,7 @@ class World(nn.Module):
     # Random gaze: (width,width)
     # Random color: (255,255,255)
     # Random shape: (num_shapes)
-    # and, for each agent, generates the radians for the individual rotation matrix
+    # and, for each agent, generates the individual rotation matrix
     def create_agents_batch(self):
 
         pos = torch.randint(0, self.width, (self.batch_size, self.num_agents, 2))
@@ -58,11 +60,18 @@ class World(nn.Module):
         gaze = torch.randint(0, self.width, (self.batch_size, self.num_agents, 2))
         color = torch.randint(0, 256, (self.batch_size, self.num_agents, 3))
         shape = torch.randint(0, self.num_shapes, (self.batch_size, self.num_agents, 1))
-        radians = torch.rand((self.batch_size, self.num_agents, 1)) * 2 * torch.pi
-
+        
+        radians = torch.rand(self.batch_size * self.num_agents ) * 2 * torch.pi
+        sines = torch.sin(radians)
+        cosines = torch.cos(radians)
+        rotation_matrices = torch.stack([
+            torch.stack([cosines, -sines], dim=1),
+            torch.stack([sines, cosines], dim=1)
+                        ], dim=1)
+        rotation_matrices = rotation_matrices.view(self.batch_size, self.num_agents, 2, 2)
 
         agents = torch.cat((pos, velocity, gaze, color, shape), dim=2)
-        return agents, radians
+        return agents, rotation_matrices
     
     # creates an batch_size*num_landmarks landmarks, giving them:
     # Random position: (width, width)
@@ -132,12 +141,14 @@ class World(nn.Module):
         }
 
         for _ in range(self.timesteps):
-            #Given that from Figure 3 in the paper the physical features
-            #seems to be extracted once for all the agents, I'm doing the same here
-            agent_physical_features = self.physical_processor(self.agents)
-            landmark_physical_features = self.physical_processor(self.landmarks)
-            physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=1)
-            physical_features = SoftmaxPooling(dim=1)(physical_features)
+
+            #compute the physical representation rotated
+            for i in range(self.num_agents):
+                agent_physical_features = self.physical_processor(self.agents, self.rotation_matrices[:,i])
+                landmark_physical_features = self.physical_processor(self.landmarks, self.rotation_matrices[:,i])
+                physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=1)
+                physical_features = SoftmaxPooling(dim=1)(physical_features)
+            print("done")
 
             utterance_features, self.utterance_memory, goal_pred = self.utterance_processor(self.utterance, self.utterance_memory)
             utterance_features = SoftmaxPooling(dim=1)(utterance_features)
