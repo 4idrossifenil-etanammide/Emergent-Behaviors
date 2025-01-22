@@ -34,7 +34,7 @@ class World(nn.Module):
 
     def reset(self):
         # shape: (batch_size, num_agents, 10)
-        self.agents = self.create_agents_batch().to(self.device)
+        self.agents, self.radians = self.create_agents_batch().to(self.device)
         # shape: (batch_size, num_landmarks, 6) or (batch_size, num_landmarks, 10) 
         self.landmarks = self.create_landmarks_batch().to(self.device)
         # shape: (batch_size, num_agents, 2)
@@ -43,12 +43,13 @@ class World(nn.Module):
         self.utterance_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size)).to(self.device)
         self.final_memory = torch.zeros((self.batch_size, self.num_agents, self.memory_size)).to(self.device)
 
-    # creates an batch_size*num_agents agents, giving them:
+    # creates batch_size*num_agents agents, giving them:
     # Random position: (width, width)
     # Zero velocity: (0,0)
     # Random gaze: (width,width)
     # Random color: (255,255,255)
     # Random shape: (num_shapes)
+    # and, for each agent, generates the radians for the individual rotation matrix
     def create_agents_batch(self):
 
         pos = torch.randint(0, self.width, (self.batch_size, self.num_agents, 2))
@@ -56,9 +57,10 @@ class World(nn.Module):
         gaze = torch.randint(0, self.width, (self.batch_size, self.num_agents, 2))
         color = torch.randint(0, 256, (self.batch_size, self.num_agents, 3))
         shape = torch.randint(0, self.num_shapes, (self.batch_size, self.num_agents, 1))
+        radians = torch.rand((self.batch_size, self.num_agents, 1)) * 2 * torch.pi
 
         agents = torch.cat((pos, velocity, gaze, color, shape), dim=2)
-        return agents
+        return agents, radians
     
     # creates an batch_size*num_landmarks landmarks, giving them:
     # Random position: (width, width)
