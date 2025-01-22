@@ -30,7 +30,7 @@ def main(render=False):
         loss, history = world()
 
         if render:
-            renderer.render(history)
+            renderer.render(history, epoch)
 
         loss.backward()
         optimizer.step()

@@ -16,12 +16,12 @@ class Renderer():
             shapes.append(i)  # Polygons with i sides
         return shapes
 
-    def render(self, history):
+    def render(self, history, epoch):
         pygame.init()
         self.font = pygame.font.SysFont(None, 24)
 
         self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.display.set_caption('Episode')
+        pygame.display.set_caption(f"Episode {epoch}")
         
         clock = pygame.time.Clock()
 
@@ -54,7 +54,6 @@ class Renderer():
             self.draw_shape(shape, color, pos)
 
         pygame.display.flip()
-        pygame.time.wait(3000)  # Wait for 3 seconds to view the initial state
 
         # Animate the rest of the episode
         timesteps = len(history["agents"][0]["positions"])
