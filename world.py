@@ -146,8 +146,10 @@ class World(nn.Module):
             all_agents_physical_features = []
             #compute the physical representation rotated
             for i in range(self.num_agents):
-                agent_physical_features = self.physical_processor(self.agents, self.rotation_matrices[:,i])
-                landmark_physical_features = self.physical_processor(self.landmarks, self.rotation_matrices[:,i])
+                #for every agent i in every batch, calculate the physical features of agents and landmarks
+                #using its own rotation matrix and its position for the rotation
+                agent_physical_features = self.physical_processor(self.agents, self.rotation_matrices[:,i], self.agents[:,i,:2])
+                landmark_physical_features = self.physical_processor(self.landmarks, self.rotation_matrices[:,i], self.agents[:,i,:2])
                 physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=1)
                 physical_features = SoftmaxPooling(dim=1)(physical_features)
 

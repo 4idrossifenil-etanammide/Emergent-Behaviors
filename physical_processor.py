@@ -19,9 +19,9 @@ class PhysicalProcessor(nn.Module):
                 nn.Linear(config["hidden_size"], 256)
             )
 
-    def forward(self, x, rmatrix):
+    def forward(self, x, rmatrix, agentpos):
 
-        x = self.rotate(x, rmatrix)
+        x = self.rotate(x, rmatrix, agentpos)
 
         batch, num, dim = x.shape
         x = x.reshape(batch * num, dim).float()
@@ -31,14 +31,19 @@ class PhysicalProcessor(nn.Module):
         x = x.reshape(batch, num, -1)
         return x
     
-    def rotate(self, x, rmatrix):
-        updated_x = x.clone()
+    def rotate(self, x, rmatrix, agentpos):
+        # x: B x NA x 10
+        #rmatrix: B x 2 x 2
+        #agentpos: B x 2
 
-        updated_x[:, :, :2] = updated_x[:, :, :2] @ rmatrix
-        updated_x[:, :, 4:6] = updated_x[:, :, 4:6] @ rmatrix
+        updated_x = x.clone()
+        agentpos = agentpos.unsqueeze(1)
+        rmatrix = rmatrix.unsqueeze(1)
+
+        updated_x[:, :, :2] = torch.matmul(rmatrix,(updated_x[:, :, :2] - agentpos).unsqueeze(3)).squeeze(3)
+        updated_x[:, :, 4:6] = torch.matmul(rmatrix,(updated_x[:, :, 4:6] -agentpos).unsqueeze(3)).squeeze(3)
 
         x = updated_x
-
         return x
     
         
