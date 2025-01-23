@@ -29,7 +29,7 @@ class UtteranceProcessor(nn.Module):
             nn.Linear(self.hidden_size, self.feature_size)
         )
 
-        #Is it fine for num_agents to be a dimension?
+        #Is it fine for num_agents to be a dimension? NO! # TODO change this
         self.goal_predictor = nn.Sequential(
             nn.Linear(self.feature_size, 256),
             nn.ELU(),

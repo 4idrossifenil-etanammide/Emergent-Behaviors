@@ -36,8 +36,8 @@ class World(nn.Module):
     def reset(self):
         # shape: (batch_size, num_agents, 10)
         self.agents, self.rotation_matrices = self.create_agents_batch()
-        print(self.rotation_matrices.shape)
         self.agents = self.agents.to(self.device)
+        self.rotation_matrices = self.rotation_matrices.to(self.device)
         # shape: (batch_size, num_landmarks, 6) or (batch_size, num_landmarks, 10) 
         self.landmarks = self.create_landmarks_batch().to(self.device)
         # shape: (batch_size, num_agents, 2)
@@ -71,6 +71,7 @@ class World(nn.Module):
         rotation_matrices = rotation_matrices.view(self.batch_size, self.num_agents, 2, 2)
 
         agents = torch.cat((pos, velocity, gaze, color, shape), dim=2)
+
         return agents, rotation_matrices
     
     # creates an batch_size*num_landmarks landmarks, giving them:
@@ -142,13 +143,17 @@ class World(nn.Module):
 
         for _ in range(self.timesteps):
 
+            all_agents_physical_features = []
             #compute the physical representation rotated
             for i in range(self.num_agents):
                 agent_physical_features = self.physical_processor(self.agents, self.rotation_matrices[:,i])
                 landmark_physical_features = self.physical_processor(self.landmarks, self.rotation_matrices[:,i])
                 physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=1)
                 physical_features = SoftmaxPooling(dim=1)(physical_features)
-            print("done")
+
+                all_agents_physical_features.append(physical_features.unsqueeze(1))
+
+            all_agents_physical_features = torch.cat(all_agents_physical_features, dim=1)
 
             utterance_features, self.utterance_memory, goal_pred = self.utterance_processor(self.utterance, self.utterance_memory)
             utterance_features = SoftmaxPooling(dim=1)(utterance_features)
@@ -159,6 +164,7 @@ class World(nn.Module):
             for agent_idx in range(self.num_agents):
                 private_goal = self.goals[:, agent_idx, :] 
                 private_memory = self.final_memory[:, agent_idx, :]
+                physical_features = all_agents_physical_features[:, agent_idx, :]
 
                 v, gaze, utterance, new_memory = self.action_processor(private_goal, private_memory, physical_features, utterance_features)
 
@@ -193,9 +199,9 @@ class World(nn.Module):
     #Computes the cost, by summing the joint goal distance, the auxiliary prediction cost
     # and the 
     def compute_cost(self, goal_pred):
-        #TODO: fix this to correctly pair agents and goal.
-        #Missing check for which goal has to be done (go to? look at?)
-        near_cost = torch.norm(self.agents[:, :, :2] - self.goals[:, :, 2:], dim=2).sum()
+        near_cost = self.compute_near_cost()
+
+        #TODO We should have n**2 predictions, not n predictions
         prediction_cost = torch.norm(goal_pred - self.goals).sum()
 
         #shouldn't symbols be counted also for previous iterations?
@@ -208,4 +214,23 @@ class World(nn.Module):
         utterance_cost = (symbol_counts * log_probs).sum()
 
         return near_cost + prediction_cost - utterance_cost
+    
+
+    def compute_near_cost(self):
+        near_cost = 0
+        for b in range(self.batch_size):
+            for agent in range(self.num_agents):
+                goal_type = self.goals[b, agent, 0]
+                target_agent = self.goals[b, agent, 1].long()
+                pos_x, pos_y = self.goals[b, agent, 2], self.goals[b, agent, 3]
+                
+                if goal_type == 2:
+                    gaze_x, gaze_y = self.agents[b, target_agent, 4], self.agents[b, target_agent, 5]
+                    near_cost += torch.norm(torch.tensor([gaze_x - pos_x, gaze_y - pos_y]))
+                else:
+                    target_pos_x, target_pos_y = self.agents[b, target_agent, :2]
+                    near_cost += torch.norm(torch.tensor([target_pos_x - pos_x, target_pos_y - pos_y]))
+        
+        return near_cost
+
 

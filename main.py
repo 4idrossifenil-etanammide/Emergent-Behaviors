@@ -13,7 +13,7 @@ def load_config(path: str  = "config.json"):
         config = json.load(f)
     return config
 
-def main(render=False):
+def main(render=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     config = load_config()
@@ -40,4 +40,4 @@ def main(render=False):
     
 
 if __name__ == "__main__":
-    main(render=True)
+    main()

@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 
 # In a nutshell, the agents have 10 different values defining their state:
 # - pos -> 2
@@ -20,15 +21,24 @@ class PhysicalProcessor(nn.Module):
 
     def forward(self, x, rmatrix):
 
+        x = self.rotate(x, rmatrix)
+
         batch, num, dim = x.shape
         x = x.reshape(batch * num, dim).float()
-
-        #rotate the positions and the gaze:
-        print(rmatrix.shape)
 
         x = self.physical_processor(x)
 
         x = x.reshape(batch, num, -1)
+        return x
+    
+    def rotate(self, x, rmatrix):
+        updated_x = x.clone()
+
+        updated_x[:, :, :2] = updated_x[:, :, :2] @ rmatrix
+        updated_x[:, :, 4:6] = updated_x[:, :, 4:6] @ rmatrix
+
+        x = updated_x
+
         return x
     
         

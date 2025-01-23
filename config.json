@@ -1,6 +1,6 @@
 {
     "world": {
-        "batch_size": 64,
+        "batch_size": 32,
 
         "height" : 600,
         "width" : 600,
@@ -13,7 +13,7 @@
 
         "memory_size": 32,
         
-        "timesteps": 100,
+        "timesteps": 30,
 
         "vocab_size": 50,
 
