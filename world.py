@@ -107,6 +107,7 @@ class World(nn.Module):
 
                 target_agent = random.sample(sorted(agents_to_assign), 1)[0]
                 agents_to_assign.remove(target_agent)
+                #TODO would like to have agents that have to go to somewhere but also lookat something
 
                 if goal_type == 0:
                     pos_x, pos_y = self.agents[b, target_agent, :2]
@@ -144,6 +145,7 @@ class World(nn.Module):
         for _ in range(self.timesteps):
 
             all_agents_physical_features = []
+            all_agents_utterance_fetures = []
             #compute the physical representation rotated
             for i in range(self.num_agents):
                 #for every agent i in every batch, calculate the physical features of agents and landmarks
@@ -153,16 +155,23 @@ class World(nn.Module):
                 physical_features = torch.cat((agent_physical_features, landmark_physical_features), dim=1)
                 physical_features = SoftmaxPooling(dim=1)(physical_features)
 
+                #print("utterance memory: ",self.utterance_memory.shape)
+                utterance_features, goal_pred = self.utterance_processor(self.utterance, self.utterance_memory[:,i,:])
+                utterance_features = SoftmaxPooling(dim=1)(utterance_features)
+
+                #update the memory with the aggregated utterance features
+                new_mem = self.utterance_processor.mem_update(utterance_features, self.utterance_memory[:,i,:])
+                self.utterance_memory = self.utterance_memory.clone()
+                self.utterance_memory[:, i, :] = new_mem
+
                 all_agents_physical_features.append(physical_features.unsqueeze(1))
+                all_agents_utterance_fetures.append(utterance_features.unsqueeze(1))
 
             all_agents_physical_features = torch.cat(all_agents_physical_features, dim=1)
-
-            utterance_features, self.utterance_memory, goal_pred = self.utterance_processor(self.utterance, self.utterance_memory)
-            utterance_features = SoftmaxPooling(dim=1)(utterance_features)
-
-            #print("goal prediction shape: ", goal_pred.shape)
+            all_agents_utterance_fetures = torch.cat(all_agents_utterance_fetures, dim=1)
 
             #is this necessary? might be ideal to do all of the agents at once?
+            # I, Tommaso Leonardi, 1914546, still need to thoroughly check this in light of all our updates
             for agent_idx in range(self.num_agents):
                 private_goal = self.goals[:, agent_idx, :] 
                 private_memory = self.final_memory[:, agent_idx, :]

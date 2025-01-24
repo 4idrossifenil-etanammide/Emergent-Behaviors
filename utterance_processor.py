@@ -19,7 +19,7 @@ class UtteranceProcessor(nn.Module):
             nn.Linear(self.hidden_size, self.embedding_size)
         )
 
-        self.cell = nn.GRUCell(self.embedding_size, memory_size)
+        self.cell = nn.GRUCell(self.hidden_size, memory_size)
 
         #(embedding_size + memory_size) -> (feature_size)
         self.linear = nn.Sequential(
@@ -38,20 +38,31 @@ class UtteranceProcessor(nn.Module):
         )
 
     def forward(self, x, mem):
-        x_batch, x_num, x_dim = x.shape
-        x = x.reshape(x_batch * x_num, x_dim)
+        # x: B x NA x utDim
+        # mem: B x memDim
+
+        #extract the embedding
         x = self.embedding(x)
+        x_batch, x_num, x_dim = x.shape
 
-        mem_batch, mem_num, mem_dim = mem.shape
-        mem = mem.reshape(mem_batch * mem_num, mem_dim)
+        #prepare the memory
+        mem = mem.unsqueeze(1).repeat(1,x_num,1)
 
-        new_mem = self.cell(x, mem)
+        #compute the features
+        new_x = self.linear(torch.cat((x, mem), dim=-1))
 
-        #FIrst i would compute this, and THEN update the memory
-        new_x = self.linear(torch.cat((x, new_mem), dim=1))
+        #prepare the shapes for the GRU
+     #   x = x.reshape(x_batch * x_num, x_dim)
+     #   mem_batch, mem_num, mem_dim = mem.shape
+     #   mem = mem.reshape(mem_batch * mem_num, mem_dim) 
 
-        new_mem = new_mem.reshape(mem_batch, mem_num, -1)
-        new_x = new_x.reshape(x_batch, x_num, -1)
+        #pass through the GRU to compute the new_mem
+    #    new_mem = self.cell(x, mem)
+
+        #and reshape the output mem and output x
+    #    new_mem = new_mem.reshape(mem_batch, mem_num, -1)
+     #   print("this is the shape of mem",new_mem.shape)
+     #   new_x = new_x.reshape(x_batch, x_num, -1)
 
         goal_pred_logits = self.goal_predictor(new_x)
         goal_pred = torch.cat( [torch.argmax(torch.softmax(goal_pred_logits[..., :3], dim=-1), dim=-1).unsqueeze(-1),
@@ -59,4 +70,7 @@ class UtteranceProcessor(nn.Module):
                               goal_pred_logits[..., 3 + self.num_agents:]], dim = -1)
         #should this also changfe how the loss function si defined?
 
-        return new_x, new_mem, goal_pred
+        return new_x, goal_pred
+    
+    def mem_update(self, x, mem):
+        return self.cell(x, mem)
