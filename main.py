@@ -19,7 +19,7 @@ def main(render=True):
     config = load_config()
 
     world = World(config, device)
-    optimizer = torch.optim.AdamW(world.parameters(), lr=0.001)
+    optimizer = torch.optim.AdamW(world.parameters(), lr=0.005)
     epochs = 100
 
     renderer = Renderer(config["world"]["num_shapes"], config["world"]["width"], config["world"]["height"])
@@ -29,7 +29,8 @@ def main(render=True):
         optimizer.zero_grad()
         loss, history = world()
 
-        if render:
+        if render & (epoch%5 == 0) :
+            print(epoch, epoch%5)
             renderer.render(history, epoch)
 
         loss.backward()

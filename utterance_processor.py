@@ -51,25 +51,12 @@ class UtteranceProcessor(nn.Module):
         #compute the features
         new_x = self.linear(torch.cat((x, mem), dim=-1))
 
-        #prepare the shapes for the GRU
-     #   x = x.reshape(x_batch * x_num, x_dim)
-     #   mem_batch, mem_num, mem_dim = mem.shape
-     #   mem = mem.reshape(mem_batch * mem_num, mem_dim) 
-
-        #pass through the GRU to compute the new_mem
-    #    new_mem = self.cell(x, mem)
-
-        #and reshape the output mem and output x
-    #    new_mem = new_mem.reshape(mem_batch, mem_num, -1)
-     #   print("this is the shape of mem",new_mem.shape)
-     #   new_x = new_x.reshape(x_batch, x_num, -1)
-
+        #predict the goal for all the agents
         goal_pred_logits = self.goal_predictor(new_x)
         goal_pred = torch.cat( [torch.argmax(torch.softmax(goal_pred_logits[..., :3], dim=-1), dim=-1).unsqueeze(-1),
                               torch.argmax(torch.softmax(goal_pred_logits[..., 3:3 + self.num_agents], dim=-1), dim =-1).unsqueeze(-1),
                               goal_pred_logits[..., 3 + self.num_agents:]], dim = -1)
-        #should this also changfe how the loss function si defined?
-
+        #should this also changfe how the loss function si defined? yes!
         return new_x, goal_pred
     
     def mem_update(self, x, mem):

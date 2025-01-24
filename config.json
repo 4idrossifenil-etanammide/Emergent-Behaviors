@@ -1,19 +1,19 @@
 {
     "world": {
-        "batch_size": 4,
+        "batch_size": 128,
 
         "height" : 600,
         "width" : 600,
 
-        "num_agents": 3,
-        "num_landmarks":2,
+        "num_agents": 5,
+        "num_landmarks":3,
 
         "num_colors": 5,
         "num_shapes": 5,
 
         "memory_size": 32,
         
-        "timesteps": 30,
+        "timesteps": 60,
 
         "vocab_size": 50,
 

@@ -146,6 +146,7 @@ class World(nn.Module):
 
             all_agents_physical_features = []
             all_agents_utterance_fetures = []
+            all_agents_goal_pred = []
             #compute the physical representation rotated
             for i in range(self.num_agents):
                 #for every agent i in every batch, calculate the physical features of agents and landmarks
@@ -166,9 +167,11 @@ class World(nn.Module):
 
                 all_agents_physical_features.append(physical_features.unsqueeze(1))
                 all_agents_utterance_fetures.append(utterance_features.unsqueeze(1))
+                all_agents_goal_pred.append(goal_pred.unsqueeze(1))
 
             all_agents_physical_features = torch.cat(all_agents_physical_features, dim=1)
             all_agents_utterance_fetures = torch.cat(all_agents_utterance_fetures, dim=1)
+            all_agents_goal_pred = torch.cat(all_agents_goal_pred, dim=1)
 
             #is this necessary? might be ideal to do all of the agents at once?
             # I, Tommaso Leonardi, 1914546, still need to thoroughly check this in light of all our updates
@@ -213,7 +216,12 @@ class World(nn.Module):
         near_cost = self.compute_near_cost()
 
         #TODO We should have n**2 predictions, not n predictions
-        prediction_cost = torch.norm(goal_pred - self.goals).sum()
+        #also, prediction_cost cannot be simple distance, because then we would
+        # punish saying agent 42 instead of agent 1 way more than for saying agent 2 instead of agent 1
+        #while the punishment should be the same
+        #prediction_cost = torch.norm(goal_pred - self.goals).sum()
+
+        prediction_cost = 0
 
         #shouldn't symbols be counted also for previous iterations?
         symbol_counts = self.utterance.sum(dim=(0, 1))  # shape: (vocab_size)
@@ -224,6 +232,7 @@ class World(nn.Module):
 
         utterance_cost = (symbol_counts * log_probs).sum()
 
+        #temporarily prioritize near_cost
         return near_cost + prediction_cost - utterance_cost
     
 

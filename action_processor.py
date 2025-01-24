@@ -40,6 +40,7 @@ class ActionProcessor(nn.Module):
 
         new_memory = self.cell(x, memory)
 
+        #TODO need to add small noise ( u = psi_u + epsilon)
         action = self.action_decoder(torch.cat((x, new_memory), dim =-1))
         velocity = action[..., :2]
         gaze = action[..., 2:4]
