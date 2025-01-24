@@ -31,7 +31,7 @@ def main(render=True):
 
         if render & (epoch%5 == 0) :
             print(epoch, epoch%5)
-            renderer.render(history, epoch)
+        renderer.render(history, epoch)
 
         loss.backward()
         optimizer.step()

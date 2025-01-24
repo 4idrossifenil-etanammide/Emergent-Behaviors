@@ -224,13 +224,14 @@ class World(nn.Module):
         prediction_cost = 0
 
         #shouldn't symbols be counted also for previous iterations?
-        symbol_counts = self.utterance.sum(dim=(0, 1))  # shape: (vocab_size)
+        """symbol_counts = self.utterance.sum(dim=(0, 1))  # shape: (vocab_size)
         total_count = symbol_counts.sum()
 
         probs = symbol_counts / (0.1 + total_count - 1) # 0.1 should be alpha. What's the correct value? TODO
         log_probs = torch.log(probs + 1e-10)
 
-        utterance_cost = (symbol_counts * log_probs).sum()
+        utterance_cost = (symbol_counts * log_probs).sum()"""
+        utterance_cost = 0
 
         #temporarily prioritize near_cost
         return near_cost + prediction_cost - utterance_cost
@@ -246,10 +247,10 @@ class World(nn.Module):
                 
                 if goal_type == 2:
                     gaze_x, gaze_y = self.agents[b, target_agent, 4], self.agents[b, target_agent, 5]
-                    near_cost += torch.norm(torch.tensor([gaze_x - pos_x, gaze_y - pos_y]))
+                    near_cost += torch.norm(torch.stack([gaze_x - pos_x, gaze_y - pos_y]))
                 else:
                     target_pos_x, target_pos_y = self.agents[b, target_agent, :2]
-                    near_cost += torch.norm(torch.tensor([target_pos_x - pos_x, target_pos_y - pos_y]))
+                    near_cost += torch.norm(torch.stack([target_pos_x - pos_x, target_pos_y - pos_y]))
         
         return near_cost
 
