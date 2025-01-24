@@ -1,6 +1,6 @@
 {
     "world": {
-        "batch_size": 16,
+        "batch_size": 1,
 
         "height" : 600,
         "width" : 600,
@@ -13,30 +13,14 @@
 
         "memory_size": 32,
         
-        "timesteps": 60,
+        "timesteps": 15,
 
         "vocab_size": 50,
 
         "delta_t": 0.1,
-        "damping": 0.5
-    },
+        "damping": 0.5,
 
-    "physical_processor":{
-        "hidden_size": 256
-    },
-
-    "utterance_processor":{
-        "embedding_size": 16,
-        "hidden_size": 256,
-        "feature_size": 256
-    },
-
-    "action_processor": {
-        "actions": 3,
-        "goal_size": 4,
-        "embedding_size": 64,
-        "hidden_size": 256,
-        "feature_size": 256
+        "hidden_size": 64
     }
 
 }

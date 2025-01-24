@@ -9,19 +9,16 @@ import torch
 # - shape -> 1
 # Using same logic, landmarks have just 6 (no gaze nor velocity)
 class PhysicalProcessor(nn.Module):
-    def __init__(self, config):
+    def __init__(self, hidden_size):
         super(PhysicalProcessor, self).__init__()
         
         self.physical_processor = nn.Sequential(
-                nn.Linear(10, config["hidden_size"]),
-                nn.Dropout(0.1),
+                nn.Linear(10, hidden_size),
                 nn.ELU(),
-                nn.Linear(config["hidden_size"], 256)
+                nn.Linear(hidden_size, 256)
             )
 
-    def forward(self, x, rmatrix, agentpos):
-
-        x = self.rotate(x, rmatrix, agentpos)
+    def forward(self, x):
 
         batch, num, dim = x.shape
         x = x.reshape(batch * num, dim).float()
@@ -29,21 +26,6 @@ class PhysicalProcessor(nn.Module):
         x = self.physical_processor(x)
 
         x = x.reshape(batch, num, -1)
-        return x
-    
-    def rotate(self, x, rmatrix, agentpos):
-        # x: B x NA x 10
-        #rmatrix: B x 2 x 2
-        #agentpos: B x 2
-
-        updated_x = x.clone()
-        agentpos = agentpos.unsqueeze(1)
-        rmatrix = rmatrix.unsqueeze(1)
-
-        updated_x[:, :, :2] = torch.matmul(rmatrix,(updated_x[:, :, :2] - agentpos).unsqueeze(3)).squeeze(3)
-        updated_x[:, :, 4:6] = torch.matmul(rmatrix,(updated_x[:, :, 4:6] -agentpos).unsqueeze(3)).squeeze(3)
-
-        x = updated_x
         return x
     
         

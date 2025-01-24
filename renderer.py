@@ -80,7 +80,7 @@ class Renderer():
                 self.draw_shape(shape, color, pos)
 
             pygame.display.flip()
-            clock.tick(5)  # Adjust the speed of the animation
+            clock.tick(10)  # Adjust the speed of the animation
 
         pygame.quit()
 
