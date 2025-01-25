@@ -34,7 +34,7 @@ class World(nn.Module):
 
         self.physical_processor = PhysicalProcessor(self.hidden_size).to(self.device)
         self.utterance_processor = UtteranceProcessor(self.hidden_size, self.memory_size, self.vocab_size).to(self.device)
-        self.action_processor = ActionProcessor(self.hidden_size, self.memory_size, self.vocab_size).to(self.device)
+        self.action_processor = ActionProcessor(self.hidden_size, self.memory_size, self.vocab_size, self.width).to(self.device)
 
     def reset(self):
         self.agents, self.rotation_matrices = self.create_agents_batch()

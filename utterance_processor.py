@@ -17,7 +17,7 @@ class UtteranceProcessor(nn.Module):
         self.cell = nn.GRUCell(self.hidden_size, memory_size)
 
         self.linear = nn.Sequential(
-            nn.Linear(self.hidden_size + self.memory_size, self.hidden_size),
+            nn.Linear(self.memory_size, self.hidden_size),
             nn.ELU(),
             nn.Linear(self.hidden_size, 256)
         )
@@ -33,7 +33,7 @@ class UtteranceProcessor(nn.Module):
         mem = mem.reshape(mem_batch * mem_num, mem_dim)
 
         new_mem = self.cell(x, mem)
-        x = self.linear(torch.cat((x,new_mem), dim=-1))
+        x = self.linear(new_mem)
 
         x = x.reshape(x_batch, x_num, -1)
         new_mem = new_mem.reshape(mem_batch, mem_num, -1)
