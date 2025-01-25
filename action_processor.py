@@ -46,18 +46,8 @@ class ActionProcessor(nn.Module):
         velocity = self.velocity_decoder(torch.cat((x, new_memory), dim=-1))
         gaze = self.gaze_decoder(torch.cat((x, new_memory), dim=-1))
         utterance_logits = self.utterance_decoder(torch.cat((x, new_memory), dim=-1))
-        utterance = self.gumbel_softmax(utterance_logits)
+        
+        utterance = F.gumbel_softmax(utterance_logits, tau=1.0, hard=True)
 
         return velocity, gaze, utterance, new_memory
-
-    def gumbel_softmax(self, logits, temperature = 1.0):
-
-        gumbel_noise = -torch.log(-torch.log(torch.rand_like(logits)))
-        y = logits + gumbel_noise
-        y_soft = F.softmax(y / temperature, dim=-1)
-
-        _, max_indices = y_soft.max(dim=-1, keepdim=True)
-        y_hard = torch.zeros_like(y_soft).scatter(-1, max_indices, 1.0)
-        y_hard = (y_hard - y_soft).detach() + y_soft
-        return y_hard
 
