@@ -57,19 +57,23 @@ class World(nn.Module):
                         ], dim=1)
         rotation_matrices = rotation_matrices.view(self.batch_size, self.num_agents, 2, 2)
 
-        pos = torch.tensor([[[100,100],[500,100],[500, 500]]])
+        pos = torch.tensor([[[100,100],[500,100],[500, 500]]]).repeat(self.batch_size, 1, 1)
         velocity = torch.zeros((self.batch_size, self.num_agents, 2)) 
-        gaze = torch.tensor([[[150,150],[250,250],[350, 350]]])
-        color = torch.tensor([[[255,0,0],[0,255,0],[0, 0, 255]]])
-        shape = torch.tensor([[[1],[2],[3]]])
+        gaze = torch.tensor([[[150,150],[250,250],[350, 350]]]).repeat(self.batch_size, 1, 1)
+        color = torch.tensor([[[255,0,0],[0,255,0],[0, 0, 255]]]).repeat(self.batch_size, 1, 1)
+        shape = torch.tensor([[[1],[2],[3]]]).repeat(self.batch_size, 1, 1)
 
         agents = torch.cat((pos, velocity, gaze, color, shape), dim=2)
-        return agents, rotation_matrices
+
+        self.initial_positions = pos.clone().to(self.device)
+        self.initial_gazes = gaze.clone().to(self.device)
+        #return agents, rotation_matrices
+        return agents, torch.ones((self.batch_size, self.num_agents, 2, 2))
     
     def create_landmarks_batch(self):
-        pos = torch.tensor([[[250,300],[350,300]]])
-        color = torch.tensor([[[255,255,0],[0,255,255]]])
-        shapes = torch.tensor([[[1],[2]]])
+        pos = torch.tensor([[[250,300],[350,300]]]).repeat(self.batch_size, 1, 1)
+        color = torch.tensor([[[255,255,0],[0,255,255]]]).repeat(self.batch_size, 1, 1)
+        shapes = torch.tensor([[[1],[2]]]).repeat(self.batch_size, 1, 1)
         velocity = torch.zeros((self.batch_size, self.num_landmarks, 2))
         gaze = torch.tensor([-1,-1]).repeat(self.batch_size, self.num_landmarks, 1)
         landmarks = torch.cat((pos, velocity, gaze, color, shapes), dim=2)
@@ -77,10 +81,10 @@ class World(nn.Module):
 
     def assign_goals(self):
 
-        goals = torch.tensor([[[1,1,250,300], #First agent should make second agent go to 150,100 (first landmark)
-                               [2,0,350,300], #Second agent should make first agent look at 250,200
+        goals = torch.tensor([[[1,1,250,300],   # First agent should make second agent go to 250,300 (first landmark)
+                               [2,0,350,300],   # Second agent should make first agent look at 350,300
                                [0,2,500,500]]]) # Third agent should make itself do nothing
-        return goals
+        return goals.repeat(self.batch_size, 1, 1)
     
     #return relative position observation for one agent
     def get_observation(self, agent_idx):
@@ -143,12 +147,12 @@ class World(nn.Module):
 
                 # Transition dynamics
                 updated_agents = self.agents.clone()
-                updated_agents[:, agent_idx, :2] = updated_agents[:, agent_idx, :2] + v * self.delta_t  # Position
-                updated_agents[:, agent_idx, 2:4] = updated_agents[:, agent_idx, 2:4] * self.damping + v * self.delta_t  # Velocity
-                updated_agents[:, agent_idx, 4:6] = gaze  # Gaze
+                updated_agents[:, agent_idx, :2] = updated_agents[:, agent_idx, :2] + v# * self.delta_t  # Position
+                updated_agents[:, agent_idx, 2:4] = v  # Velocity
+                updated_agents[:, agent_idx, 4:6] = updated_agents[:, agent_idx, 4:6] + gaze  # Gaze
                 self.agents = updated_agents
 
-                history.update(agent_idx, updated_agents, gaze, utterance)
+                history.update(agent_idx, updated_agents, utterance)
 
             total_cost += self.compute_near_cost()
 
@@ -166,10 +170,14 @@ class World(nn.Module):
                 if goal_type == 2:
                     gaze_x, gaze_y = self.agents[b, target_agent, 4], self.agents[b, target_agent, 5]
                     near_cost += torch.norm(torch.stack([gaze_x - pos_x, gaze_y - pos_y]))
+                    near_cost += torch.norm(self.initial_positions[b, target_agent] - self.agents[b, target_agent, :2])
                 else:
                     target_pos_x, target_pos_y = self.agents[b, target_agent, :2]
                     near_cost += torch.norm(torch.stack([target_pos_x - pos_x, target_pos_y - pos_y]))
+                    near_cost += torch.norm(self.initial_gazes[b, target_agent] - self.agents[b, target_agent, 4:6])
         
         return near_cost
+    
+
 
 

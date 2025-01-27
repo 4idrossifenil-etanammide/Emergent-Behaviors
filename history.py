@@ -23,9 +23,9 @@ class History:
             ]
         }
 
-    def update(self, agent_idx, updated_agents, gaze, utterance):
+    def update(self, agent_idx, updated_agents, utterance):
         self.history["agents"][agent_idx]["positions"].append(updated_agents[:, agent_idx, :2].clone())
-        self.history["agents"][agent_idx]["gaze"].append(gaze.clone())
+        self.history["agents"][agent_idx]["gaze"].append(updated_agents[:, agent_idx, 4:6].clone())
         self.history["agents"][agent_idx]["utterances"].append(utterance.clone())
 
     def get_history(self):

@@ -1,6 +1,6 @@
 {
     "world": {
-        "batch_size": 1,
+        "batch_size": 16,
 
         "height" : 600,
         "width" : 600,
