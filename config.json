@@ -13,7 +13,7 @@
 
         "memory_size": 32,
         
-        "timesteps": 15,
+        "timesteps": 100,
 
         "vocab_size": 50,
 

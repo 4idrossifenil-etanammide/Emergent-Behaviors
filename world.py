@@ -177,7 +177,3 @@ class World(nn.Module):
                     near_cost += torch.norm(self.initial_gazes[b, target_agent] - self.agents[b, target_agent, 4:6])
         
         return near_cost
-    
-
-
-

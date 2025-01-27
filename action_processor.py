@@ -12,27 +12,27 @@ class ActionProcessor(nn.Module):
 
         self.goal_embedding = nn.Sequential(
             nn.Linear(4, self.hidden_size//2),
-            nn.ELU(),
+            nn.LeakyReLU(),
             nn.Linear(self.hidden_size//2, self.hidden_size)
         )
 
         self.velocity_decoder = nn.Sequential(
             nn.Linear(self.memory_size, self.hidden_size),
-            nn.ELU(),
+            nn.LeakyReLU(),
             nn.Linear(self.hidden_size, 2),
             nn.Tanh()
         )
 
         self.gaze_decoder = nn.Sequential(
             nn.Linear(self.memory_size, self.hidden_size),
-            nn.ELU(),
+            nn.LeakyReLU(),
             nn.Linear(self.hidden_size, 2),
             nn.Tanh()
         )
 
         self.utterance_decoder = nn.Sequential(
             nn.Linear(self.memory_size, self.hidden_size),
-            nn.ELU(),
+            nn.LeakyReLU(),
             nn.Linear(self.hidden_size, self.vocab_size)
         )
 
