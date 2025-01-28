@@ -50,8 +50,8 @@ class ActionProcessor(nn.Module):
         gaze = self.gaze_decoder(torch.cat((x, new_memory), dim=-1))
         utterance_logits = self.utterance_decoder(torch.cat((x, new_memory), dim=-1))"""
 
-        velocity = self.velocity_decoder(new_memory) * 40
-        gaze = self.gaze_decoder(new_memory) * 40
+        velocity = self.velocity_decoder(new_memory) * 10
+        gaze = self.gaze_decoder(new_memory) * 10
         utterance_logits = self.utterance_decoder(new_memory)
 
         utterance = F.gumbel_softmax(utterance_logits, tau=1.0, hard=True)

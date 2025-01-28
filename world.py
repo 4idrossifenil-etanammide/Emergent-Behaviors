@@ -57,11 +57,11 @@ class World(nn.Module):
                         ], dim=1)
         rotation_matrices = rotation_matrices.view(self.batch_size, self.num_agents, 2, 2)
 
-        pos = torch.tensor([[[100,100],[500,100],[500, 500]]]).repeat(self.batch_size, 1, 1)
+        pos = torch.rand((self.batch_size, self.num_agents, 2)) * self.width
         velocity = torch.zeros((self.batch_size, self.num_agents, 2)) 
-        gaze = torch.tensor([[[150,150],[250,250],[350, 350]]]).repeat(self.batch_size, 1, 1)
-        color = torch.tensor([[[255,0,0],[0,255,0],[0, 0, 255]]]).repeat(self.batch_size, 1, 1)
-        shape = torch.tensor([[[1],[2],[3]]]).repeat(self.batch_size, 1, 1)
+        gaze = torch.rand((self.batch_size, self.num_agents, 2)) * self.width
+        color = torch.randint(0, 255, (self.batch_size, self.num_agents, 3))
+        shape = torch.randint(0, self.num_shapes, (self.batch_size, self.num_agents, 1))
 
         agents = torch.cat((pos, velocity, gaze, color, shape), dim=2)
 
@@ -71,20 +71,33 @@ class World(nn.Module):
         return agents, torch.ones((self.batch_size, self.num_agents, 2, 2))
     
     def create_landmarks_batch(self):
-        pos = torch.tensor([[[250,300],[350,300]]]).repeat(self.batch_size, 1, 1)
-        color = torch.tensor([[[255,255,0],[0,255,255]]]).repeat(self.batch_size, 1, 1)
-        shapes = torch.tensor([[[1],[2]]]).repeat(self.batch_size, 1, 1)
+        pos = torch.rand((self.batch_size, self.num_landmarks, 2)) * self.width
+        color = torch.randint(0, 255, (self.batch_size, self.num_landmarks, 3))
+        shapes = torch.randint(0, self.num_shapes, (self.batch_size, self.num_landmarks, 1))
         velocity = torch.zeros((self.batch_size, self.num_landmarks, 2))
         gaze = torch.tensor([-1,-1]).repeat(self.batch_size, self.num_landmarks, 1)
         landmarks = torch.cat((pos, velocity, gaze, color, shapes), dim=2)
         return landmarks
 
     def assign_goals(self):
+        goals = torch.zeros((self.batch_size, self.num_agents, 4))
+        for b in range(self.batch_size):
+            for agent in range(self.num_agents):
+                goal_type = random.choice([0, 1, 2])
+                target_agent = random.choice(range(self.num_agents))
+                
+                if goal_type == 0:  # Do nothing
+                    pos_x, pos_y = self.initial_positions[b, target_agent]
+                else:  # Go to or Look at
+                    landmark_idx = random.choice(range(self.num_landmarks))
+                    pos_x, pos_y = self.landmarks[b, landmark_idx, :2]
 
-        goals = torch.tensor([[[1,1,250,300],   # First agent should make second agent go to 250,300 (first landmark)
-                               [2,0,350,300],   # Second agent should make first agent look at 350,300
-                               [0,2,500,500]]]) # Third agent should make itself do nothing
-        return goals.repeat(self.batch_size, 1, 1)
+                goals[b, agent, 0] = goal_type
+                goals[b, agent, 1] = target_agent
+                goals[b, agent, 2] = pos_x
+                goals[b, agent, 3] = pos_y
+
+        return goals
     
     #return relative position observation for one agent
     def get_observation(self, agent_idx):
@@ -99,6 +112,7 @@ class World(nn.Module):
         updated_landmark_positions[:, :, :2] = relative_landmark_pos
 
         obs = torch.cat((updated_agents_positions, updated_landmark_positions), dim=1)
+
         return obs
 
     def forward(self):

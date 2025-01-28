@@ -1,9 +1,9 @@
 {
     "world": {
-        "batch_size": 16,
+        "batch_size": 1,
 
-        "height" : 600,
-        "width" : 600,
+        "height" : 300,
+        "width" : 300,
 
         "num_agents": 3,
         "num_landmarks":2,

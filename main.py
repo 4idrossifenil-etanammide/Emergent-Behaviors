@@ -19,7 +19,7 @@ def main(render=True):
     config = load_config()
 
     world = World(config, device)
-    optimizer = torch.optim.AdamW(world.parameters(), lr=0.005)
+    optimizer = torch.optim.Adam(world.parameters(), lr=1E-3)
     epochs = 1000
 
     renderer = Renderer(config["world"]["num_shapes"], config["world"]["width"], config["world"]["height"])
