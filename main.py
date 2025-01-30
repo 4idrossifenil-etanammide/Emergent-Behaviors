@@ -29,9 +29,8 @@ def main(render=True):
         optimizer.zero_grad()
         loss, history = world()
 
-        if render & (epoch%5 == 0) :
-            print(epoch, epoch%5)
-        renderer.render(history, epoch)
+        if render & (epoch%100 == 0) :
+            renderer.render(history, epoch)
 
         loss.backward()
         optimizer.step()

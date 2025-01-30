@@ -82,20 +82,15 @@ class World(nn.Module):
     def assign_goals(self):
         goals = torch.zeros((self.batch_size, self.num_agents, 4))
         for b in range(self.batch_size):
-            for agent in range(self.num_agents):
-                goal_type = random.choice([0, 1, 2])
-                target_agent = random.choice(range(self.num_agents))
-                
-                if goal_type == 0:  # Do nothing
-                    pos_x, pos_y = self.initial_positions[b, target_agent]
-                else:  # Go to or Look at
-                    landmark_idx = random.choice(range(self.num_landmarks))
-                    pos_x, pos_y = self.landmarks[b, landmark_idx, :2]
+            agent = 0
+            goal_type = 1
+            target_agent = 0
+            pos_x, pos_y = self.landmarks[b, 0, :2]
 
-                goals[b, agent, 0] = goal_type
-                goals[b, agent, 1] = target_agent
-                goals[b, agent, 2] = pos_x
-                goals[b, agent, 3] = pos_y
+            goals[b, agent, 0] = goal_type
+            goals[b, agent, 1] = target_agent
+            goals[b, agent, 2] = pos_x
+            goals[b, agent, 3] = pos_y
 
         return goals
     
@@ -116,7 +111,10 @@ class World(nn.Module):
         return obs
 
     def forward(self):
-        total_cost = 0
+
+        rewards = []
+        log_probs = []
+
         history = History(self.agents, self.landmarks)
 
         for _ in range(self.timesteps):
@@ -149,7 +147,7 @@ class World(nn.Module):
                 physical_features = all_agents_physical_features[:, agent_idx, :]
                 utterance_features = all_agents_utterance_features[:, agent_idx, :]
 
-                v, gaze, utterance, new_memory = self.action_processor(private_goal, private_memory, physical_features, utterance_features)
+                v, v_log_prob, gaze, gaze_log_prob, utterance, new_memory = self.action_processor(private_goal, private_memory, physical_features, utterance_features)
 
                 updated_final_memory = self.final_memory.clone()
                 updated_final_memory[:, agent_idx, :] = new_memory
@@ -161,33 +159,37 @@ class World(nn.Module):
 
                 # Transition dynamics
                 updated_agents = self.agents.clone()
-                updated_agents[:, agent_idx, :2] = updated_agents[:, agent_idx, :2] + v# * self.delta_t  # Position
+                updated_agents[:, agent_idx, :2] = updated_agents[:, agent_idx, :2] + v  # Position
                 updated_agents[:, agent_idx, 2:4] = v  # Velocity
                 updated_agents[:, agent_idx, 4:6] = updated_agents[:, agent_idx, 4:6] + gaze  # Gaze
                 self.agents = updated_agents
+                
+                reward = self.compute_reward(agent_idx)
+                rewards.append(reward)
+                log_probs.append(v_log_prob)
 
                 history.update(agent_idx, updated_agents, utterance)
 
-            total_cost += self.compute_near_cost()
+            loss = self.compute_loss(log_probs, rewards)
 
-        return total_cost, history.get_history()
+        return loss, history.get_history()
     
 
-    def compute_near_cost(self):
-        near_cost = 0
-        for b in range(self.batch_size):
-            for agent in range(self.num_agents):
-                goal_type = self.goals[b, agent, 0]
-                target_agent = self.goals[b, agent, 1].long()
-                pos_x, pos_y = self.goals[b, agent, 2], self.goals[b, agent, 3]
-                
-                if goal_type == 2:
-                    gaze_x, gaze_y = self.agents[b, target_agent, 4], self.agents[b, target_agent, 5]
-                    near_cost += torch.norm(torch.stack([gaze_x - pos_x, gaze_y - pos_y]))
-                    near_cost += torch.norm(self.initial_positions[b, target_agent] - self.agents[b, target_agent, :2])
-                else:
-                    target_pos_x, target_pos_y = self.agents[b, target_agent, :2]
-                    near_cost += torch.norm(torch.stack([target_pos_x - pos_x, target_pos_y - pos_y]))
-                    near_cost += torch.norm(self.initial_gazes[b, target_agent] - self.agents[b, target_agent, 4:6])
-        
-        return near_cost
+    def compute_reward(self, agent_idx):
+        return -torch.norm(self.agents[:, agent_idx, :2] - self.goals[:, agent_idx, 2:4]) #Hardcoded for now
+
+    def compute_loss(self, log_probs, rewards, gamma = 0.99):
+        returns = []
+        G = 0
+
+        for r in reversed(rewards):
+            G = r + gamma * G
+            returns.insert(0, G)
+
+        returns = torch.stack(returns).to(self.device)
+        returns = (returns - returns.mean()) / (returns.std() + 1e-9)
+
+        loss = -torch.stack(log_probs) * returns
+        loss = loss.sum()
+
+        return loss
