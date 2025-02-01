@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,33 +12,33 @@ VISUALIZE_EVERY = 50
 
 class EnhancedEnvironment:
     def __init__(self):
-        self.agent_pos = np.zeros(2)
-        self.landmark_pos = np.zeros(2)
+        self.agent_pos = torch.zeros(2)
+        self.landmark_pos = torch.zeros(2)
         self.current_step = 0
 
     def reset(self):
-        self.agent_pos = np.random.uniform(-0.5, 0.5, size=2)
-        self.landmark_pos = np.random.uniform(-1, 1, size=2)
+        self.agent_pos = (torch.rand(2) - 0.5)
+        self.landmark_pos = (torch.rand(2) * 2 - 1)
         self.current_step = 0
         return self._get_state()
 
     def _get_state(self):
-        return np.concatenate([
+        return torch.cat([
             self.landmark_pos - self.agent_pos,
             self.agent_pos  # Adding absolute position helps learning
         ])
 
     def step(self, action):
-        action = np.clip(action, -1, 1) * STEP_SIZE
+        action = torch.clamp(action, -1, 1) * STEP_SIZE
         self.agent_pos += action
-        self.agent_pos = np.clip(self.agent_pos, -1, 1)
+        self.agent_pos = torch.clamp(self.agent_pos, -1, 1)
         self.current_step += 1
 
-        distance = np.linalg.norm(self.agent_pos - self.landmark_pos)
+        distance = torch.norm(self.agent_pos - self.landmark_pos)
         done = self.current_step >= MAX_STEPS #or distance < 0.05
         
         # Enhanced reward function
-        reward = -distance - 0.1*np.linalg.norm(action)  # Penalize large actions
+        reward = -distance - 0.1 * torch.norm(action)  # Penalize large actions
         if distance < 0.05:  # Success bonus
             reward += 2.0
             
@@ -76,11 +75,11 @@ class PPO:
         self.clip_epsilon = clip_epsilon
 
     def update(self, states, actions, old_log_probs, returns, advantages):
-        states = torch.FloatTensor(np.array(states)).to(self.device)
-        actions = torch.FloatTensor(np.array(actions)).to(self.device)
-        old_log_probs = torch.FloatTensor(np.array(old_log_probs)).to(self.device).detach()
-        returns = torch.FloatTensor(np.array(returns)).to(self.device)
-        advantages = torch.FloatTensor(np.array(advantages)).to(self.device)
+        states = torch.FloatTensor([s.tolist() for s in states]).to(self.device)
+        actions = torch.FloatTensor([a.tolist() for a in actions]).to(self.device)
+        old_log_probs = torch.FloatTensor(old_log_probs).to(self.device).detach()
+        returns = torch.FloatTensor(returns).to(self.device)
+        advantages = torch.FloatTensor(advantages).to(self.device)
 
         # Calculate new policy
         means, _ = self.policy(states)
@@ -116,7 +115,7 @@ def train():
     while True:
         states, actions, rewards, dones, old_log_probs = [], [], [], [], []
         state = env.reset()
-        states_traj = [env.agent_pos.copy()]
+        states_traj = [env.agent_pos.clone()]
         done = False
 
         while not done:
@@ -124,17 +123,17 @@ def train():
                 action_mean, value = agent.policy(torch.FloatTensor(state).to(agent.device))
                 action_std = torch.exp(agent.policy.log_std)
                 dist = Normal(action_mean, action_std)
-                action = dist.sample().cpu().numpy()
-                log_prob = dist.log_prob(torch.FloatTensor(action).to(agent.device)).sum().item()
+                action = dist.sample().cpu()
+                log_prob = dist.log_prob(action.to(agent.device)).sum().item()
 
             next_state, reward, done = env.step(action)
             
             states.append(state)
             actions.append(action)
-            rewards.append(reward)
+            rewards.append(reward.item())
             dones.append(done)
             old_log_probs.append(log_prob)
-            states_traj.append(env.agent_pos.copy())
+            states_traj.append(env.agent_pos.clone())
 
             state = next_state
 
@@ -146,7 +145,7 @@ def train():
             returns.insert(0, discounted_return)
         
         returns = torch.FloatTensor(returns)
-        returns = (returns - returns.mean()) / (returns.std(correction=0) + 1e-8)
+        returns = (returns - returns.mean()) / (returns.std(unbiased=False) + 1e-8)
 
         # Update policy
         agent.update(states, actions, old_log_probs, returns, returns)
