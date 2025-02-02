@@ -4,23 +4,30 @@ import torch.optim as optim
 import pygame
 from torch.distributions import Normal
 
+import gymnasium as gym
+
 # Environment parameters
 WORLD_SIZE = 2.0
 STEP_SIZE = 0.1
 MAX_STEPS = 50
 VISUALIZE_EVERY = 50
 
-class EnhancedEnvironment:
+class EmergentEnv(gym.Env):
     def __init__(self):
         self.agent_pos = torch.zeros(2)
         self.landmark_pos = torch.zeros(2)
-        self.current_step = 0
+        
+        self.observation_space = gym.spaces.Box(-1, 1, (4,))
+        self.action_space = gym.spaces.Box(-.1, .1, (2,))
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+
         self.agent_pos = (torch.rand(2) - 0.5)
         self.landmark_pos = (torch.rand(2) * 2 - 1)
         self.current_step = 0
-        return self._get_state()
+        
+        return self._get_state(), {}
 
     def _get_state(self):
         return torch.cat([
@@ -35,14 +42,18 @@ class EnhancedEnvironment:
         self.current_step += 1
 
         distance = torch.norm(self.agent_pos - self.landmark_pos)
-        done = self.current_step >= MAX_STEPS or distance < 0.05
+        truncated = self.current_step >= MAX_STEPS
+        terminated = distance < 0.05
         
         # Enhanced reward function
         reward = -distance - 0.1 * torch.norm(action)  # Penalize large actions
         if distance < 0.05:  # Success bonus
             reward += 2.0
+
+        observation = self._get_state()
+        info = {}
             
-        return self._get_state(), reward, done
+        return observation, reward, terminated, truncated, info
 
 # DO NOT TOUCH, FOR WHATEVER REASON,
 # THE LAST TANH LAYER IN THE ACTOR MODEL
@@ -110,18 +121,23 @@ class PPO:
         self.optimizer.step()
 
 def train():
-    env = EnhancedEnvironment()
-    state_dim = len(env.reset())
+    gym.register(
+        id="Emergent-v0",
+        entry_point=EmergentEnv,
+    )
+
+    env = gym.make("Emergent-v0")
+    state_dim = env.observation_space.shape[0]  # Extract observation space length directly
     agent = PPO(state_dim)
     
     episode = 0
     while True:
         states, actions, rewards, dones, old_log_probs = [], [], [], [], []
-        state = env.reset()
+        state, _ = env.reset()
         states_traj = [env.agent_pos.clone()]
-        done = False
+        terminated, truncated = False, False
 
-        while not done:
+        while not (terminated or truncated):
             with torch.no_grad():
                 action_mean, value = agent.policy(torch.FloatTensor(state).to(agent.device))
                 action_std = torch.exp(agent.policy.log_std)
@@ -129,12 +145,12 @@ def train():
                 action = dist.sample().cpu()
                 log_prob = dist.log_prob(action.to(agent.device)).sum().item()
 
-            next_state, reward, done = env.step(action)
+            next_state, reward, terminated, truncated, _ = env.step(action)
             
             states.append(state)
             actions.append(action)
             rewards.append(reward.item())
-            dones.append(done)
+            dones.append(terminated or truncated)
             old_log_probs.append(log_prob)
             states_traj.append(env.agent_pos.clone())
 
