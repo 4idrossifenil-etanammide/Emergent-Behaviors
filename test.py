@@ -148,7 +148,7 @@ def train():
             returns.insert(0, discounted_return)
         
         returns = torch.FloatTensor(returns)
-        returns = (returns - returns.mean()) / (returns.std(correction=0) + 1e-8)
+        returns = (returns - returns.mean()) / (returns.std(correction=0) + 1e-8) # DO NOT TOUCH THE correction=0, OTHERWISE IT WILL NOT WORK
 
         # Update policy
         agent.update(states, actions, old_log_probs, returns, returns)
