@@ -13,12 +13,15 @@ MAX_STEPS = 50
 VISUALIZE_EVERY = 50
 
 class EmergentEnv(gym.Env):
-    def __init__(self):
+    def __init__(self, render_env = False):
         self.agent_pos = torch.zeros(2)
         self.landmark_pos = torch.zeros(2)
         
         self.observation_space = gym.spaces.Box(-1, 1, (4,))
         self.action_space = gym.spaces.Box(-.1, .1, (2,))
+
+        self.render_env = render_env
+
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -26,6 +29,9 @@ class EmergentEnv(gym.Env):
         self.agent_pos = (torch.rand(2) - 0.5)
         self.landmark_pos = (torch.rand(2) * 2 - 1)
         self.current_step = 0
+
+        if self.render_env:
+            self.states_traj = [self.agent_pos.clone()]
         
         return self._get_state(), {}
 
@@ -40,6 +46,9 @@ class EmergentEnv(gym.Env):
         self.agent_pos += action
         #self.agent_pos = torch.clamp(self.agent_pos, -1, 1)
         self.current_step += 1
+        
+        if self.render_env:
+            self.states_traj.append(self.agent_pos.clone())
 
         distance = torch.norm(self.agent_pos - self.landmark_pos)
         truncated = self.current_step >= MAX_STEPS
@@ -54,6 +63,39 @@ class EmergentEnv(gym.Env):
         info = {}
             
         return observation, reward, terminated, truncated, info
+    
+    def render(self):
+        pygame.init()
+        screen = pygame.display.set_mode((400, 400))
+        pygame.display.set_caption(f"PPO")
+        clock = pygame.time.Clock()
+        
+        # Modified scaling function
+        def scale(pos):
+            return int((pos[0] + 1) * 200), int((pos[1] + 1) * 200)
+        
+        landmark_scaled = scale(self.landmark_pos)
+        trajectory = [scale(p) for p in self.states_traj]
+
+        for i in range(1, len(trajectory)+1):
+            screen.fill((255, 255, 255))
+            pygame.draw.circle(screen, (0, 255, 0), landmark_scaled, 10)
+            
+            # Current position
+            pygame.draw.circle(screen, (0, 0, 255), trajectory[i-1], 5)
+            
+            # Path drawing
+            if i > 1:
+                pygame.draw.lines(screen, (255, 0, 0), False, trajectory[:i], 2)
+            
+            pygame.display.flip()
+            clock.tick(20)
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    return
+        pygame.quit()
 
 # DO NOT TOUCH, FOR WHATEVER REASON,
 # THE LAST TANH LAYER IN THE ACTOR MODEL
@@ -126,7 +168,7 @@ def train():
         entry_point=EmergentEnv,
     )
 
-    env = gym.make("Emergent-v0")
+    env = gym.make("Emergent-v0", render_env=True)
     state_dim = env.observation_space.shape[0]  # Extract observation space length directly
     agent = PPO(state_dim)
     
@@ -134,7 +176,6 @@ def train():
     while True:
         states, actions, rewards, dones, old_log_probs = [], [], [], [], []
         state, _ = env.reset()
-        states_traj = [env.agent_pos.clone()]
         terminated, truncated = False, False
 
         while not (terminated or truncated):
@@ -152,7 +193,6 @@ def train():
             rewards.append(reward.item())
             dones.append(terminated or truncated)
             old_log_probs.append(log_prob)
-            states_traj.append(env.agent_pos.clone())
 
             state = next_state
 
@@ -172,42 +212,9 @@ def train():
         # Visualization
         if episode % VISUALIZE_EVERY == 0:
             print(f"Episode {episode}, Total Reward: {sum(rewards):.2f}")
-            visualize(states_traj, env.landmark_pos, episode)
+            env.render()
         
         episode += 1
-
-def visualize(positions, landmark_pos, episode):
-    pygame.init()
-    screen = pygame.display.set_mode((400, 400))
-    pygame.display.set_caption(f"PPO - Episode {episode}")
-    clock = pygame.time.Clock()
-    
-    # Modified scaling function
-    def scale(pos):
-        return int((pos[0] + 1) * 200), int((pos[1] + 1) * 200)
-    
-    landmark_scaled = scale(landmark_pos)
-    trajectory = [scale(p) for p in positions]
-
-    for i in range(1, len(trajectory)+1):
-        screen.fill((255, 255, 255))
-        pygame.draw.circle(screen, (0, 255, 0), landmark_scaled, 10)
-        
-        # Current position
-        pygame.draw.circle(screen, (0, 0, 255), trajectory[i-1], 5)
-        
-        # Path drawing
-        if i > 1:
-            pygame.draw.lines(screen, (255, 0, 0), False, trajectory[:i], 2)
-        
-        pygame.display.flip()
-        clock.tick(20)
-        
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                return
-    pygame.quit()
 
 if __name__ == "__main__":
     train()
