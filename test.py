@@ -29,13 +29,13 @@ class EnhancedEnvironment:
         ])
 
     def step(self, action):
-        action = torch.clamp(action, -1, 1) * STEP_SIZE
+        action = action * STEP_SIZE
         self.agent_pos += action
-        self.agent_pos = torch.clamp(self.agent_pos, -1, 1)
+        #self.agent_pos = torch.clamp(self.agent_pos, -1, 1)
         self.current_step += 1
 
         distance = torch.norm(self.agent_pos - self.landmark_pos)
-        done = self.current_step >= MAX_STEPS #or distance < 0.05
+        done = self.current_step >= MAX_STEPS or distance < 0.05
         
         # Enhanced reward function
         reward = -distance - 0.1 * torch.norm(action)  # Penalize large actions
@@ -44,6 +44,8 @@ class EnhancedEnvironment:
             
         return self._get_state(), reward, done
 
+# DO NOT TOUCH, FOR WHATEVER REASON,
+# THE LAST TANH LAYER IN THE ACTOR MODEL
 class ActorCritic(nn.Module):
     def __init__(self, state_dim, hidden_dim=256):
         super().__init__()
@@ -52,7 +54,8 @@ class ActorCritic(nn.Module):
             nn.Tanh(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
-            nn.Linear(hidden_dim, 2)
+            nn.Linear(hidden_dim, 2),
+            nn.Tanh()
         )
         self.critic = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
@@ -145,7 +148,7 @@ def train():
             returns.insert(0, discounted_return)
         
         returns = torch.FloatTensor(returns)
-        returns = (returns - returns.mean()) / (returns.std(unbiased=False) + 1e-8)
+        returns = (returns - returns.mean()) / (returns.std(correction=0) + 1e-8)
 
         # Update policy
         agent.update(states, actions, old_log_probs, returns, returns)
