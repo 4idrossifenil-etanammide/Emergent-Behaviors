@@ -6,7 +6,6 @@ from torch.distributions import Normal
 
 import gymnasium as gym
 
-# Environment parameters
 WORLD_SIZE = 2.0
 STEP_SIZE = 0.1
 MAX_STEPS = 50
@@ -54,7 +53,6 @@ class EmergentEnv(gym.Env):
         truncated = self.current_step >= MAX_STEPS
         terminated = distance < 0.05
         
-        # Enhanced reward function
         reward = -distance - 0.1 * torch.norm(action)  # Penalize large actions
         if distance < 0.05:  # Success bonus
             reward += 2.0
@@ -70,7 +68,6 @@ class EmergentEnv(gym.Env):
         pygame.display.set_caption(f"PPO")
         clock = pygame.time.Clock()
         
-        # Modified scaling function
         def scale(pos):
             return int((pos[0] + 1) * 200), int((pos[1] + 1) * 200)
         
@@ -137,25 +134,21 @@ class PPO:
         returns = torch.FloatTensor(returns).to(self.device)
         advantages = torch.FloatTensor(advantages).to(self.device)
 
-        # Calculate new policy
-        means, _ = self.policy(states)
+        # Compute new log probabilities
+        means, values = self.policy(states)
         stds = torch.exp(self.policy.log_std)
         dist = Normal(means, stds)
         new_log_probs = dist.log_prob(actions).sum(-1)
 
         # PPO loss
-        ratio = (new_log_probs - old_log_probs).exp()
-        clipped_ratio = ratio.clamp(1 - self.clip_epsilon, 1 + self.clip_epsilon)
-        policy_loss = -torch.min(ratio * advantages, clipped_ratio * advantages).mean()
+        ratio = (new_log_probs - old_log_probs).exp() # ratio between log probs
+        clipped_ratio = ratio.clamp(1 - self.clip_epsilon, 1 + self.clip_epsilon) # clipped ratio
+        policy_loss = -torch.min(ratio * advantages, clipped_ratio * advantages).mean() # ensure small updates 
 
         # Value loss
-        _, values = self.policy(states)
-        value_loss = 0.5 * (returns - values.squeeze()).pow(2).mean()
+        value_loss = (returns - values.squeeze()).pow(2).mean()
 
-        # Entropy bonus
-        entropy_loss = -dist.entropy().mean()
-
-        total_loss = policy_loss + 0.5 * value_loss + 0.01 * entropy_loss
+        total_loss = policy_loss +  value_loss 
 
         self.optimizer.zero_grad()
         total_loss.backward()
@@ -169,12 +162,12 @@ def train():
     )
 
     env = gym.make("Emergent-v0", render_env=True)
-    state_dim = env.observation_space.shape[0]  # Extract observation space length directly
+    state_dim = env.observation_space.shape[0]
     agent = PPO(state_dim)
     
     episode = 0
     while True:
-        states, actions, rewards, dones, old_log_probs = [], [], [], [], []
+        states, actions, rewards, dones, old_log_probs, values = [], [], [], [], [], []
         state, _ = env.reset()
         terminated, truncated = False, False
 
@@ -191,6 +184,7 @@ def train():
             states.append(state)
             actions.append(action)
             rewards.append(reward.item())
+            values.append(value.item())
             dones.append(terminated or truncated)
             old_log_probs.append(log_prob)
 
@@ -204,12 +198,13 @@ def train():
             returns.insert(0, discounted_return)
         
         returns = torch.FloatTensor(returns)
+        values_tensor = torch.FloatTensor(values)
+        advantages = returns - values_tensor
+        advantages = (advantages - advantages.mean()) / (advantages.std(correction=0) + 1e-8)
         returns = (returns - returns.mean()) / (returns.std(correction=0) + 1e-8) # DO NOT TOUCH THE correction=0, OTHERWISE IT WILL NOT WORK
 
-        # Update policy
-        agent.update(states, actions, old_log_probs, returns, returns)
+        agent.update(states, actions, old_log_probs, returns, advantages)
 
-        # Visualization
         if episode % VISUALIZE_EVERY == 0:
             print(f"Episode {episode}, Total Reward: {sum(rewards):.2f}")
             env.render()
