@@ -32,6 +32,7 @@ class EmergentEnv(gym.Env):
 
         self.render_env = render_env
 
+        self.colors_map = {i: tuple(torch.randint(0, 256, (3,)).tolist()) for i in range(NUM_COLORS)}
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -101,11 +102,11 @@ class EmergentEnv(gym.Env):
             pygame.draw.circle(screen, (0, 255, 0), landmark_scaled, 10)
             
             # Current position
-            for traj in trajectory:
+            for j, traj in enumerate(trajectory):
                 if i-1 < len(traj):
-                    pygame.draw.circle(screen, (255, 0, 0), traj[i-1], 5)
+                    pygame.draw.circle(screen, self.colors_map[self.agent_color[j].item()], traj[i - 1], 5)
                 if i > 1 and len(traj) >= 1:
-                    pygame.draw.lines(screen, (255, 0, 0), False, traj[:i], 2)
+                    pygame.draw.lines(screen, self.colors_map[self.agent_color[j].item()], False, traj[:i], 2)
             
             pygame.display.flip()
             clock.tick(20)
