@@ -4,6 +4,8 @@ import torch.optim as optim
 import pygame
 from torch.distributions import Normal
 
+import random
+
 import gymnasium as gym
 
 WORLD_SIZE = 2.0
@@ -14,30 +16,35 @@ VISUALIZE_EVERY = 50
 NUM_COLORS = 5
 NUM_SHAPES = 5
 
+MAX_AGENTS = 4
+MAX_LANDMARKS = 4
+
 class EmergentEnv(gym.Env):
-    def __init__(self, render_env = False, n_agents = 3, n_landmarks = 2):
-        self.n_agents = n_agents
-        self.n_landmarks = n_landmarks
+    def __init__(self, render_env = False):
 
-        self.agent_pos = torch.zeros((n_agents, 2))
-        self.agent_color = torch.randint(0, NUM_COLORS, (n_agents, 1))
-        self.agent_shape = torch.randint(0, NUM_SHAPES, (n_agents, 1))
+        """self.agent_pos = torch.zeros((self.n_agents, 2))
+        self.agent_color = torch.randint(0, NUM_COLORS, (self.n_agents, 1))
+        self.agent_shape = torch.randint(0, NUM_SHAPES, (self.n_agents, 1))
 
-        self.landmark_pos = torch.zeros((n_landmarks, 2))
-        self.landmark_color = torch.randint(0, NUM_COLORS, (n_landmarks, 1))
-        self.landmark_shape = torch.randint(0, NUM_SHAPES, (n_landmarks, 1))
+        self.landmark_pos = torch.zeros((self.n_landmarks, 2))
+        self.landmark_color = torch.randint(0, NUM_COLORS, (self.n_landmarks, 1))
+        self.landmark_shape = torch.randint(0, NUM_SHAPES, (self.n_landmarks, 1))
 
-        self.goals = torch.zeros((n_agents, 1))
+        self.goals = torch.zeros((self.n_agents, 1))"""
+        self.n_agents = 0
+        self.n_landmarks = 0
+        self.observation_space = gym.spaces.Box(-1, 1, (self.n_agents, 4))
+        self.action_space = gym.spaces.Box(-.1, .1, (self.n_agents, 2))
         
-        self.observation_space = gym.spaces.Box(-1, 1, (n_agents, 4))
-        self.action_space = gym.spaces.Box(-.1, .1, (n_agents, 2))
-
         self.render_env = render_env
 
         self.colors_map = {i: tuple(torch.randint(0, 256, (3,)).tolist()) for i in range(NUM_COLORS)}
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
+
+        self.n_agents = random.randint(1, MAX_AGENTS)
+        self.n_landmarks = random.randint(1, MAX_LANDMARKS)
 
         self.agent_pos = (torch.rand((self.n_agents, 2)) * 2 - 1)
         self.agent_color = torch.randint(0, NUM_COLORS, (self.n_agents, 1))
@@ -53,6 +60,9 @@ class EmergentEnv(gym.Env):
 
         if self.render_env:
             self.states_traj = [self.agent_pos.clone()]
+
+        self.observation_space = gym.spaces.Box(-1, 1, (self.n_agents, 4))
+        self.action_space = gym.spaces.Box(-.1, .1, (self.n_agents, 2))
         
         return self._get_state(), {}
 
@@ -198,19 +208,20 @@ def train():
     )
 
     env = gym.make("Emergent-v0", render_env=True)
-    state_dim = env.observation_space.shape[-1]
+    state_dim = 4
     agent = PPO(state_dim)
     
     episode = 0
     while True:
+
+        state, _ = env.reset()
+        terminated, truncated = False, False
+
         agent_states = [[] for _ in range(env.n_agents)]
         agent_actions = [[] for _ in range(env.n_agents)]
         agent_rewards = [[] for _ in range(env.n_agents)]
         agent_old_log_probs = [[] for _ in range(env.n_agents)]
         agent_values = [[] for _ in range(env.n_agents)]
-
-        state, _ = env.reset()
-        terminated, truncated = False, False
 
         while not (terminated or truncated):
             with torch.no_grad():
@@ -250,8 +261,8 @@ def train():
             returns = torch.FloatTensor(returns)
             values_tensor = torch.FloatTensor(values)
             advantages = returns - values_tensor
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-            returns = (returns - returns.mean()) / (returns.std() + 1e-8)
+            advantages = (advantages - advantages.mean()) / (advantages.std(correction = 0) + 1e-8)
+            returns = (returns - returns.mean()) / (returns.std(correction = 0) + 1e-8)
 
             all_states.extend(agent_states[i])
             all_actions.extend(agent_actions[i])
