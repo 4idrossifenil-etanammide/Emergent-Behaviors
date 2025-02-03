@@ -1,9 +1,8 @@
 from physical_processor import PhysicalProcessor
 from utterance_processor import UtteranceProcessor
 from softmax_pooling import SoftmaxPooling
-from action_processor import ActionProcessor
+from old.action_processor import ActionProcessor
 from math import cos, sin
-from history import History
 
 import torch
 import torch.nn as nn
@@ -115,8 +114,6 @@ class World(nn.Module):
         rewards = []
         log_probs = []
 
-        history = History(self.agents, self.landmarks)
-
         for _ in range(self.timesteps):
 
             all_agents_physical_features = []
@@ -168,11 +165,10 @@ class World(nn.Module):
                 rewards.append(reward)
                 log_probs.append(v_log_prob)
 
-                history.update(agent_idx, updated_agents, utterance)
 
             loss = self.compute_loss(log_probs, rewards)
 
-        return loss, history.get_history()
+        return loss
     
 
     def compute_reward(self, agent_idx):
