@@ -96,6 +96,7 @@ class EmergentEnv(gym.Env):
         screen = pygame.display.set_mode((400, 400))
         pygame.display.set_caption(f"PPO")
         clock = pygame.time.Clock()
+        font = pygame.font.SysFont(None, 24)
         
         def scale(pos):
             return int((pos[0] + 1) * 200), int((pos[1] + 1) * 200)
@@ -107,11 +108,16 @@ class EmergentEnv(gym.Env):
             screen.fill((255, 255, 255))
             for k, landmark in enumerate(landmarks_scaled):
                 pygame.draw.circle(screen, self.colors_map[self.landmark_color[k].item()], landmark, 10)
+                text = font.render(str(k), True, (0,0,0))
+                screen.blit(text, (landmark[0] - text.get_width() // 2, landmark[1] - text.get_height() // 2))
             
             # Current position
             for j, traj in enumerate(trajectory):
                 if i-1 < len(traj):
                     pygame.draw.circle(screen, self.colors_map[self.agent_color[j].item()], traj[i - 1], 5)
+                    goal_index = self.goals[j].item()
+                    text = font.render(str(goal_index), True, (0, 0, 0))
+                    screen.blit(text, (traj[i - 1][0] - text.get_width() // 2, traj[i - 1][1] - 20))
                 if i > 1 and len(traj) >= 1:
                     pygame.draw.lines(screen, self.colors_map[self.agent_color[j].item()], False, traj[:i], 2)
             
