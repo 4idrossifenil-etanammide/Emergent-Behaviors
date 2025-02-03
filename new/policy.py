@@ -1,11 +1,21 @@
 import torch
 from torch import nn, optim
 from torch.distributions import Normal
+import torch.nn.functional as F
 
+import environment
 
 class ActorCritic(nn.Module):
     def __init__(self, state_dim, hidden_dim=256):
         super().__init__()
+        self.utterance_net = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, environment.VOCAB_SIZE)
+        )
+
         self.actor = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
             nn.Tanh(),
@@ -24,7 +34,14 @@ class ActorCritic(nn.Module):
         self.log_std = nn.Parameter(torch.zeros(2))
 
     def forward(self, x):
-        return self.actor(x), self.critic(x)
+        physical = x[:2]
+        utterance = x[2:environment.VOCAB_SIZE]
+        memory = x[environment.VOCAB_SIZE:environment.MEMORY_SIZE]
+        goal = x[-1]
+
+        utterance_logits = self.utterance_net(x)
+        utterance = F.gumbel_softmax(utterance_logits, tau=1.0, hard=True)
+        return self.actor(x), utterance, self.critic(x)
 
 class PPO:
     def __init__(self, state_dim, lr=3e-4, gamma=0.99, clip_epsilon=0.2):
@@ -42,7 +59,7 @@ class PPO:
         advantages = torch.FloatTensor(advantages).to(self.device)
 
         # Compute new log probabilities
-        means, values = self.policy(states)
+        means, utterances, values = self.policy(states)
         stds = torch.exp(self.policy.log_std)
         dist = Normal(means, stds)
         new_log_probs = dist.log_prob(actions).sum(-1)

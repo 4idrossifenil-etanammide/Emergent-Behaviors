@@ -3,6 +3,7 @@ import torch
 from torch.distributions import Normal
 from policy import PPO  
 from environment import EmergentEnv
+import environment
 
 VISUALIZE_EVERY = 50
 
@@ -13,7 +14,7 @@ def train():
     )
 
     env = gym.make("Emergent-v0", render_env=True)
-    state_dim = 5
+    state_dim = 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE + 1 # 2 because position are bidimensional, 1 because goal is a scalar
     agent = PPO(state_dim)
     
     episode = 0
@@ -30,13 +31,13 @@ def train():
 
         while not (terminated or truncated):
             with torch.no_grad():
-                action_mean, values = agent.policy(torch.FloatTensor(state).to(agent.device))
+                action_mean, utterances, values = agent.policy(torch.FloatTensor(state).to(agent.device))
                 action_std = torch.exp(agent.policy.log_std)
                 dist = Normal(action_mean, action_std.unsqueeze(0))
                 actions = dist.sample()
                 log_probs = dist.log_prob(actions.to(agent.device)).sum(dim=-1)
 
-            next_state, rewards, terminated, truncated, _ = env.step(actions.cpu())
+            next_state, rewards, terminated, truncated, _ = env.step([actions.cpu(), utterances])
             
             for i in range(env.n_agents):
                 agent_states[i].append(state[i])
