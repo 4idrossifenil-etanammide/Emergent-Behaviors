@@ -21,19 +21,9 @@ MAX_LANDMARKS = 4
 
 class EmergentEnv(gym.Env):
     def __init__(self, render_env = False):
-
-        """self.agent_pos = torch.zeros((self.n_agents, 2))
-        self.agent_color = torch.randint(0, NUM_COLORS, (self.n_agents, 1))
-        self.agent_shape = torch.randint(0, NUM_SHAPES, (self.n_agents, 1))
-
-        self.landmark_pos = torch.zeros((self.n_landmarks, 2))
-        self.landmark_color = torch.randint(0, NUM_COLORS, (self.n_landmarks, 1))
-        self.landmark_shape = torch.randint(0, NUM_SHAPES, (self.n_landmarks, 1))
-
-        self.goals = torch.zeros((self.n_agents, 1))"""
         self.n_agents = 0
         self.n_landmarks = 0
-        self.observation_space = gym.spaces.Box(-1, 1, (self.n_agents, 4))
+        self.observation_space = gym.spaces.Box(-1, 1, (self.n_agents, 5))
         self.action_space = gym.spaces.Box(-.1, .1, (self.n_agents, 2))
         
         self.render_env = render_env
@@ -50,27 +40,35 @@ class EmergentEnv(gym.Env):
         self.agent_color = torch.randint(0, NUM_COLORS, (self.n_agents, 1))
         self.agent_shape = torch.randint(0, NUM_SHAPES, (self.n_agents, 1))
 
+        self.initial_pos = self.agent_pos.clone()
+
         self.landmark_pos = (torch.rand((self.n_landmarks, 2)) * 2 - 1)
         self.landmark_color = torch.randint(0, NUM_COLORS, (self.n_landmarks, 1))
         self.landmark_shape = torch.randint(0, NUM_SHAPES, (self.n_landmarks, 1))
 
+        self.tasks = torch.randint(0, 2, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
         self.goals = torch.randint(0, self.n_landmarks, (self.n_agents, 1))
+        self.goals[self.tasks == 1] = -1
 
         self.current_step = 0
 
         if self.render_env:
             self.states_traj = [self.agent_pos.clone()]
 
-        self.observation_space = gym.spaces.Box(-1, 1, (self.n_agents, 4))
+        self.observation_space = gym.spaces.Box(-1, 1, (self.n_agents, 5))
         self.action_space = gym.spaces.Box(-.1, .1, (self.n_agents, 2))
         
         return self._get_state(), {}
 
     def _get_state(self):
-        assigned_landmark_pos = self.landmark_pos[self.goals.squeeze().long()]
+        goals = self.goals.view(-1)
+        goal_pos = self.landmark_pos[goals.long()]
+        do_nothing_mask = goals == -1
+        goal_pos[do_nothing_mask] = self.initial_pos[do_nothing_mask]  # No movement for DO NOTHING
         return torch.cat([
-            assigned_landmark_pos - self.agent_pos,
-            self.agent_pos  # Adding absolute position helps learning
+            goal_pos - self.agent_pos,
+            self.agent_pos,  # Adding absolute position helps learning
+            self.tasks.float()  # Adding task information
         ], dim=-1)
 
     def step(self, actions):
@@ -82,8 +80,10 @@ class EmergentEnv(gym.Env):
         if self.render_env:
             self.states_traj.append(self.agent_pos.clone())
 
-        assigned_landmark_pos = self.landmark_pos[self.goals.squeeze().long()]
-        distances = torch.norm(self.agent_pos - assigned_landmark_pos, dim=1)
+        goals = self.goals.view(-1)
+        goal_pos = self.landmark_pos[goals.long()]
+        goal_pos[goals == -1] = self.initial_pos[goals == -1]
+        distances = torch.norm(self.agent_pos - goal_pos, dim=1)
         truncated = self.current_step >= MAX_STEPS
         terminated = (distances < 0.05).all()
         
@@ -125,11 +125,13 @@ class EmergentEnv(gym.Env):
             for j, traj in enumerate(trajectory):
                 if i-1 < len(traj):
                     pygame.draw.circle(screen, self.colors_map[self.agent_color[j].item()], traj[i - 1], 5)
-                    goal_index = self.goals[j].item()
-                    text = font.render(str(goal_index), True, (0, 0, 0))
-                    screen.blit(text, (traj[i - 1][0] - text.get_width() // 2, traj[i - 1][1] - 20))
+                    if self.tasks[j].item() == 0:
+                        goal_index = self.goals[j].item()
+                        text = font.render(str(goal_index), True, (0, 0, 0))
+                        screen.blit(text, (traj[i - 1][0] - text.get_width() // 2, traj[i - 1][1] - 20))
                 if i > 1 and len(traj) >= 1:
-                    pygame.draw.lines(screen, self.colors_map[self.agent_color[j].item()], False, traj[:i], 2)
+                    #pygame.draw.lines(screen, self.colors_map[self.agent_color[j].item()], False, traj[:i], 2)
+                    pass
             
             pygame.display.flip()
             clock.tick(20)
@@ -208,7 +210,7 @@ def train():
     )
 
     env = gym.make("Emergent-v0", render_env=True)
-    state_dim = 4
+    state_dim = 5
     agent = PPO(state_dim)
     
     episode = 0
