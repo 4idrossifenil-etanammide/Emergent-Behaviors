@@ -1,20 +1,26 @@
 import torch
+from torch import nn
+
 import pygame
 import random
 import gymnasium as gym
 
 WORLD_SIZE = 2.0
-STEP_SIZE = 0.05
+STEP_SIZE = 0.1
+DAMPING = 0.5
+
 MAX_STEPS = 50
 
-NUM_COLORS = 5
-NUM_SHAPES = 5
+NUM_COLORS = 8
+NUM_SHAPES = 8
 
 MAX_AGENTS = 4
 MAX_LANDMARKS = 4
 
 VOCAB_SIZE = 10
 MEMORY_SIZE = 32
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class EmergentEnv(gym.Env):
     def __init__(self, render_env = False):
@@ -33,22 +39,31 @@ class EmergentEnv(gym.Env):
         self.n_agents = random.randint(1, MAX_AGENTS)
         self.n_landmarks = random.randint(1, MAX_LANDMARKS)
 
+        all_colors = torch.randperm(NUM_COLORS)[:self.n_agents + self.n_landmarks]
+        all_shapes = torch.randperm(NUM_SHAPES)[:self.n_agents + self.n_landmarks]
+
         self.agent_pos = (torch.rand((self.n_agents, 2)) * 2 - 1)
-        self.agent_color = torch.randint(0, NUM_COLORS, (self.n_agents, 1))
-        self.agent_shape = torch.randint(0, NUM_SHAPES, (self.n_agents, 1))
+        self.agent_color = all_colors[:self.n_agents].view(-1, 1)
+        self.agent_shape =  all_shapes[:self.n_agents].view(-1, 1)
 
         self.initial_pos = self.agent_pos.clone()
 
         self.landmark_pos = (torch.rand((self.n_landmarks, 2)) * 2 - 1)
-        self.landmark_color = torch.randint(0, NUM_COLORS, (self.n_landmarks, 1))
-        self.landmark_shape = torch.randint(0, NUM_SHAPES, (self.n_landmarks, 1))
+        self.landmark_color = all_colors[self.n_agents:].view(-1, 1)
+        self.landmark_shape =  all_shapes[self.n_agents:].view(-1, 1)
 
         self.utterances = torch.zeros((self.n_agents, VOCAB_SIZE))
-        self.memories = torch.zeros((self.n_agents, MEMORY_SIZE))
+        self.memories = torch.zeros((self.n_agents, MEMORY_SIZE)).to(device)
 
-        self.tasks = torch.randint(0, 2, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
-        self.goals = torch.randint(0, self.n_landmarks, (self.n_agents, 1))
-        self.goals[self.tasks == 1] = -1
+        tasks = torch.randint(0, 2, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
+        self.targets = torch.randint(0, self.n_landmarks, (self.n_agents,1))
+        self.targets[tasks == 1] = -1
+        flat_targets = self.targets.view(-1)
+        goal_pos = self.landmark_pos[flat_targets.long()]
+        goal_pos[flat_targets == -1] = self.initial_pos[flat_targets == -1]
+        self.goals = torch.cat([tasks, goal_pos], dim = 1)
+
+        self.velocities = torch.zeros((self.n_agents, 2))
 
         self.current_step = 0
 
@@ -61,38 +76,44 @@ class EmergentEnv(gym.Env):
         
         return self._get_state(), {}
 
-    # TODO - MODIFY THIS SO THAT THE OBSERVATIONS ARE RETURNED AS A DICT.
-    #        ALSO REMOVE RELATIVE GOALS POSITIONS AND PUT RELATIVE POSITIONS WRT EVERYONE
+    # TODO Implement random rotation matrix
     def _get_state(self):
-        goals = self.goals.view(-1)
-        goal_pos = self.landmark_pos[goals.long()]
-        do_nothing_mask = goals == -1
-        goal_pos[do_nothing_mask] = self.initial_pos[do_nothing_mask]  # No movement for DO NOTHING
-        return torch.cat([
-            goal_pos - self.agent_pos, # relative to goal position
-            self.utterances,
-            self.memories,
-            self.tasks.float()  # Adding task information
-        ], dim=-1)
+        pos = []
+        for agent_idx in range(self.n_agents):
+            pos.append(
+                torch.cat([
+                    torch.cat([self.agent_pos - self.agent_pos[agent_idx, :], self.landmark_pos - self.agent_pos[agent_idx, :]], dim = 0), # shape [n_agent + n_landmark, 2]
+                    torch.cat([self.velocities, torch.zeros((self.n_landmarks, 2))], dim = 0), # shape [n_agent + n_landmark, 2]
+                    torch.cat([self.agent_color, self.landmark_color], dim = 0), # shape [n_agent + n_landmark , 1]
+                    torch.cat([self.agent_shape, self.landmark_shape], dim = 0) # shape [n_agent + n_landmark, 1]
+                ], dim = 1).unsqueeze(0) # shape [n_agent + n_landmark, 6]
+            )
+
+        physical = torch.cat(pos, dim=0) # shape [n_agent, n_agent + n_landmark, 6]
+        state = {
+            "physical": physical,
+            "utterances": self.utterances,
+            "memories": self.memories,
+            "tasks": self.goals.float()
+        }
+        return state
 
     def step(self, x):
-        actions, utterances = x
+        actions, utterances, delta_memories = x
         self.utterances = utterances
+        self.memories = nn.Tanh()(self.memories + delta_memories + 1E-8)
 
-        actions = actions * STEP_SIZE
-        self.agent_pos += actions
-        #self.agent_pos = torch.clamp(self.agent_pos, -1, 1)
+        # Transition dynamics. STEP SIZE is delta_t and DAMPING is damping factor
+        self.agent_pos += self.velocities * STEP_SIZE
+        self.velocities = self.velocities * DAMPING + actions * STEP_SIZE
+
         self.current_step += 1
         
         if self.render_env:
             self.states_traj.append(self.agent_pos.clone())
             self.utterances_traj.append(self.utterances.clone())
 
-        goals = self.goals.view(-1)
-        goal_pos = self.landmark_pos[goals.long()]
-        goal_pos[goals == -1] = self.initial_pos[goals == -1]
-
-        distances = torch.norm(self.agent_pos - goal_pos, dim=1)
+        distances = torch.norm(self.agent_pos - self.goals[:, 1:], dim=1)
 
         truncated = self.current_step >= MAX_STEPS
         terminated = (distances < 0.05).all()
@@ -138,8 +159,8 @@ class EmergentEnv(gym.Env):
                 screen.blit(utterance_text, (traj[i - 1][0] - utterance_text.get_width() // 2, traj[i - 1][1] + 20))
                 if i-1 < len(traj):
                     pygame.draw.circle(screen, self.colors_map[self.agent_color[j].item()], traj[i - 1], 5)
-                    if self.tasks[j].item() == 0:
-                        goal_index = self.goals[j].item()
+                    if self.goals[j][0].item() == 0:
+                        goal_index = self.targets[j].item()
                         text = font.render(str(goal_index), True, (0, 0, 0))
                         screen.blit(text, (traj[i - 1][0] - text.get_width() // 2, traj[i - 1][1] - 20))
 

@@ -3,45 +3,32 @@ from torch import nn, optim
 from torch.distributions import Normal
 import torch.nn.functional as F
 
+from actor import Actor
 import environment
 
 class ActorCritic(nn.Module):
-    def __init__(self, state_dim, hidden_dim=256):
+    def __init__(self, hidden_dim=256):
         super().__init__()
-        self.utterance_net = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, environment.VOCAB_SIZE)
-        )
+        self.actor = Actor(hidden_dim)
 
-        self.actor = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, 2),
-            nn.Tanh()
-        )
         self.critic = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),
+            nn.Linear(hidden_dim*2 + environment.MEMORY_SIZE + 3, hidden_dim),
             nn.Tanh(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
             nn.Linear(hidden_dim, 1)
         )
-        self.log_std = nn.Parameter(torch.zeros(2))
 
-    def forward(self, x):
-        physical = x[:2]
-        utterance = x[2:environment.VOCAB_SIZE]
-        memory = x[environment.VOCAB_SIZE:environment.MEMORY_SIZE]
-        goal = x[-1]
+    def forward(self, state):
+        physical = state["physical"]
+        utterances = state["utterances"]
+        memories = state["memories"]
+        tasks = state["tasks"]
 
-        utterance_logits = self.utterance_net(x)
-        utterance = F.gumbel_softmax(utterance_logits, tau=1.0, hard=True)
-        return self.actor(x), utterance, self.critic(x)
+        actions_means, actions_log_std, utterances_logits, delta_memories, physical_features, utterances_features = self.actor(physical, utterances, memories, tasks)
+
+        next_utterances = F.gumbel_softmax(utterances_logits, tau=1.0, hard=True)
+        return actions_means, actions_log_std, next_utterances, delta_memories, self.critic(torch.cat([physical_features, utterances_features, memories, tasks], dim = 1)) # TODO check critic input
 
 class PPO:
     def __init__(self, state_dim, lr=3e-4, gamma=0.99, clip_epsilon=0.2):
@@ -52,15 +39,14 @@ class PPO:
         self.clip_epsilon = clip_epsilon
 
     def update(self, states, actions, old_log_probs, returns, advantages):
-        states = torch.FloatTensor([s.tolist() for s in states]).to(self.device)
         actions = torch.FloatTensor([a.tolist() for a in actions]).to(self.device)
         old_log_probs = torch.FloatTensor(old_log_probs).to(self.device).detach()
         returns = torch.FloatTensor(returns).to(self.device)
         advantages = torch.FloatTensor(advantages).to(self.device)
 
         # Compute new log probabilities
-        means, utterances, values = self.policy(states)
-        stds = torch.exp(self.policy.log_std)
+        means, log_std, utterances, _, values = self.policy(states) # TODO implement utterances loss
+        stds = torch.exp(log_std)
         dist = Normal(means, stds)
         new_log_probs = dist.log_prob(actions).sum(-1)
 

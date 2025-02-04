@@ -21,9 +21,15 @@ def train():
     while True:
 
         state, _ = env.reset()
+
         terminated, truncated = False, False
 
-        agent_states = [[] for _ in range(env.n_agents)]
+        agent_states = {
+            "physical": [],
+            "utterances": [],
+            "memories": [],
+            "tasks": []
+        }
         agent_actions = [[] for _ in range(env.n_agents)]
         agent_rewards = [[] for _ in range(env.n_agents)]
         agent_old_log_probs = [[] for _ in range(env.n_agents)]
@@ -31,24 +37,29 @@ def train():
 
         while not (terminated or truncated):
             with torch.no_grad():
-                action_mean, utterances, values = agent.policy(torch.FloatTensor(state).to(agent.device))
-                action_std = torch.exp(agent.policy.log_std)
+                action_mean, action_log_std, utterances, delta_memories, values = agent.policy({k:v.to(agent.device) for k,v in state.items()})
+                action_std = torch.exp(action_log_std)
                 dist = Normal(action_mean, action_std.unsqueeze(0))
                 actions = dist.sample()
+                actions = actions.view(env.n_agents, 2)
                 log_probs = dist.log_prob(actions.to(agent.device)).sum(dim=-1)
+                log_probs = log_probs.view(-1)
 
-            next_state, rewards, terminated, truncated, _ = env.step([actions.cpu(), utterances])
+            next_state, rewards, terminated, truncated, _ = env.step([actions.cpu(), utterances, delta_memories])
             
             for i in range(env.n_agents):
-                agent_states[i].append(state[i])
                 agent_actions[i].append(actions[i].cpu().numpy())
                 agent_rewards[i].append(rewards[i])
                 agent_old_log_probs[i].append(log_probs[i].item())
                 agent_values[i].append(values[i].item())
 
+            agent_states["physical"].append(state["physical"].to(agent.device))
+            agent_states["utterances"].append(state["utterances"].to(agent.device))
+            agent_states["memories"].append(state["memories"].to(agent.device))
+            agent_states["tasks"].append(state["tasks"].to(agent.device))
+
             state = next_state
 
-        all_states = []
         all_actions = []
         all_old_log_probs = []
         all_returns = []
@@ -71,12 +82,12 @@ def train():
             advantages = (advantages - advantages.mean()) / (advantages.std(correction = 0) + 1e-8) 
             returns = (returns - returns.mean()) / (returns.std(correction = 0) + 1e-8)
 
-            all_states.extend(agent_states[i])
             all_actions.extend(agent_actions[i])
             all_old_log_probs.extend(agent_old_log_probs[i])
             all_returns.extend(returns.tolist())
             all_advantages.extend(advantages.tolist())
 
+        all_states = {k: torch.cat(v, dim=0) for k,v in agent_states.items()}
         agent.update(all_states, all_actions, all_old_log_probs, all_returns, all_advantages)
 
         if episode % VISUALIZE_EVERY == 0:
