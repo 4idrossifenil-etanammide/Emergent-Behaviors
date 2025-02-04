@@ -16,6 +16,7 @@ def train():
     env = gym.make("Emergent-v0", render_env=True)
     state_dim = 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE + 1 # 2 because position are bidimensional, 1 because goal is a scalar
     agent = PPO(state_dim)
+    n_agents = env.unwrapped.n_agents
     
     episode = 0
     while True:
@@ -30,10 +31,11 @@ def train():
             "memories": [],
             "tasks": []
         }
-        agent_actions = [[] for _ in range(env.n_agents)]
-        agent_rewards = [[] for _ in range(env.n_agents)]
-        agent_old_log_probs = [[] for _ in range(env.n_agents)]
-        agent_values = [[] for _ in range(env.n_agents)]
+
+        agent_actions = [[] for _ in range(n_agents)]
+        agent_rewards = [[] for _ in range(n_agents)]
+        agent_old_log_probs = [[] for _ in range(n_agents)]
+        agent_values = [[] for _ in range(n_agents)]
 
         while not (terminated or truncated):
             with torch.no_grad():
@@ -41,13 +43,13 @@ def train():
                 action_std = torch.exp(action_log_std)
                 dist = Normal(action_mean, action_std.unsqueeze(0))
                 actions = dist.sample()
-                actions = actions.view(env.n_agents, 2)
+                actions = actions.view(n_agents, 2)
                 log_probs = dist.log_prob(actions.to(agent.device)).sum(dim=-1)
                 log_probs = log_probs.view(-1)
 
             next_state, rewards, terminated, truncated, _ = env.step([actions.cpu(), utterances, delta_memories])
             
-            for i in range(env.n_agents):
+            for i in range(n_agents):
                 agent_actions[i].append(actions[i].cpu().numpy())
                 agent_rewards[i].append(rewards[i])
                 agent_old_log_probs[i].append(log_probs[i].item())
@@ -65,7 +67,7 @@ def train():
         all_returns = []
         all_advantages = []
 
-        for i in range(env.n_agents):
+        for i in range(n_agents):
             rewards = agent_rewards[i]
             values = agent_values[i]
 

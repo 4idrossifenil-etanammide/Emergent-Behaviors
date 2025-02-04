@@ -1,3 +1,4 @@
 epygame
 torch
 numpy
+gymnasium
