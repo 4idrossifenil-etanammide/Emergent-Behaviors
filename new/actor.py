@@ -8,7 +8,7 @@ class Actor(nn.Module):
     def __init__(self, hidden_dim):
         super().__init__()
         self.action_net = nn.Sequential(
-            nn.Linear(hidden_dim*2 + environment.MEMORY_SIZE + 3, hidden_dim),
+            nn.Linear(hidden_dim + environment.MEMORY_SIZE + 3, hidden_dim),
             nn.Tanh(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
@@ -47,8 +47,8 @@ class Actor(nn.Module):
                                       memories.repeat(1,num_agents).view(num_agents, num_agents, -1)], dim = 2)
         utterances_features = self.utterance_processor(utterances_input)
         utterances_features = SoftmaxPooling(dim=1)(utterances_features)
-
-        output = self.action_net(torch.cat([physical_features, utterances_features, memories, tasks], dim=1))
+        
+        output = self.action_net(torch.cat([physical_features, memories, tasks], dim=1))
         actions_means = nn.Tanh()(output[:, :2])
         action_log_std = output[:, 2:4]
         utterances_logits = output[:, 4: 4 + environment.VOCAB_SIZE]

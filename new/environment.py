@@ -6,10 +6,10 @@ import random
 import gymnasium as gym
 
 WORLD_SIZE = 2.0
-STEP_SIZE = 0.3
-DAMPING = 0.2
+STEP_SIZE = 0.1
+DAMPING = 0.4
 
-MAX_STEPS = 50
+MAX_STEPS = 70
 
 NUM_COLORS = 8
 NUM_SHAPES = 8
@@ -18,7 +18,7 @@ MAX_AGENTS = 4
 MAX_LANDMARKS = 4
 
 VOCAB_SIZE = 10
-MEMORY_SIZE = 32
+MEMORY_SIZE = 16
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -57,7 +57,7 @@ class EmergentEnv(gym.Env):
         self.memories = torch.zeros((self.n_agents, MEMORY_SIZE)).to(device)
 
         #task initialization
-        tasks = torch.randint(0, 2, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
+        tasks = torch.randint(1, 2, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
         self.targets = torch.randint(0, self.n_landmarks, (self.n_agents,1))
         self.targets[tasks == 1] = -1
         flat_targets = self.targets.view(-1)
@@ -84,20 +84,23 @@ class EmergentEnv(gym.Env):
         for agent_idx in range(self.n_agents):
             pos.append(
                 torch.cat([
-                    torch.cat([self.agent_pos, self.landmark_pos], dim = 0), # shape [n_agent + n_landmark, 2]
-                    #torch.cat([self.agent_pos - self.agent_pos[agent_idx, :], self.landmark_pos - self.agent_pos[agent_idx, :]], dim = 0), # shape [n_agent + n_landmark, 2]
+                    #torch.cat([self.agent_pos, self.landmark_pos], dim = 0), # shape [n_agent + n_landmark, 2]
+                    torch.cat([self.agent_pos - self.agent_pos[agent_idx, :], self.landmark_pos - self.agent_pos[agent_idx, :]], dim = 0), # shape [n_agent + n_landmark, 2]
                     torch.cat([self.velocities, torch.zeros((self.n_landmarks, 2))], dim = 0), # shape [n_agent + n_landmark, 2]
                     torch.cat([self.agent_color, self.landmark_color], dim = 0), # shape [n_agent + n_landmark , 1]
                     torch.cat([self.agent_shape, self.landmark_shape], dim = 0) # shape [n_agent + n_landmark, 1]
                 ], dim = 1).unsqueeze(0) # shape [n_agent + n_landmark, 6]
             )
+        
+        relative_goals = self.goals.clone()
+        relative_goals[:,1:] = self.goals[:,1:] - self.agent_pos[:,1:]
 
         physical = torch.cat(pos, dim=0) # shape [n_agent, n_agent + n_landmark, 6]
         state = {
             "physical": physical,
             "utterances": self.utterances,
             "memories": self.memories,
-            "tasks": self.goals.float()
+            "tasks": relative_goals.float()
         }
         return state
 
@@ -105,6 +108,7 @@ class EmergentEnv(gym.Env):
         actions, utterances, delta_memories = x
         self.utterances = utterances
         self.memories = nn.Tanh()(self.memories + delta_memories + 1E-8)  #why the tanh?
+        prev_distances = torch.norm(self.agent_pos - self.goals[:, 1:], dim=1)
 
         # Transition dynamics. STEP SIZE is delta_t and DAMPING is damping factor
         self.agent_pos += self.velocities * STEP_SIZE
@@ -124,12 +128,15 @@ class EmergentEnv(gym.Env):
         
         rewards = []
         for i in range(self.n_agents):
-            dist = distances[i].item()
+            delta_dist = prev_distances[i].item() - distances[i].item()
             action_norm = torch.norm(actions[i]).item()
-            reward = -dist - 0.5 * action_norm  #todo, change reward to be confronted with previous one
-            reward = -dist
-            if dist < 0.1:
+            reward = delta_dist - 0.0 * action_norm  #todo, change reward to be confronted with previous one
+            #reward = delta_dist
+            if truncated and distances[i] < 0.05:
                 reward += 1.0
+            elif truncated:
+                reward -= 1.0
+
             rewards.append(reward)
 
         observation = self._get_state()
