@@ -16,12 +16,12 @@ def train():
     env = gym.make("Emergent-v0", render_env=True)
     state_dim = 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE + 1 # 2 because position are bidimensional, 1 because goal is a scalar
     agent = PPO(state_dim)
-    n_agents = env.unwrapped.n_agents
     
     episode = 0
     while True:
 
         state, _ = env.reset()
+        n_agents = env.unwrapped.n_agents
 
         terminated, truncated = False, False
 
@@ -39,9 +39,9 @@ def train():
 
         while not (terminated or truncated):
             with torch.no_grad():
-                action_mean, action_log_std, utterances, delta_memories, values = agent.policy({k:v.to(agent.device) for k,v in state.items()})
+                action_mean, action_log_std, utterances, delta_memories, values, actions = agent.policy({k:v.to(agent.device) for k,v in state.items()})
                 action_std = torch.exp(action_log_std)
-                dist = Normal(action_mean, action_std.unsqueeze(0))
+                dist = Normal(action_mean, action_std) #removed an unsqueeze here
                 actions = dist.sample()
                 actions = actions.view(n_agents, 2)
                 log_probs = dist.log_prob(actions.to(agent.device)).sum(dim=-1)

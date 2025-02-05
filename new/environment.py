@@ -6,7 +6,7 @@ import random
 import gymnasium as gym
 
 WORLD_SIZE = 2.0
-STEP_SIZE = 0.1
+STEP_SIZE = 0.3
 DAMPING = 0.5
 
 MAX_STEPS = 50
@@ -23,6 +23,7 @@ MEMORY_SIZE = 32
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class EmergentEnv(gym.Env):
+
     def __init__(self, render_env = False):
         self.n_agents = 0
         self.n_landmarks = 0
@@ -55,13 +56,14 @@ class EmergentEnv(gym.Env):
         self.utterances = torch.zeros((self.n_agents, VOCAB_SIZE))
         self.memories = torch.zeros((self.n_agents, MEMORY_SIZE)).to(device)
 
+        #task initialization
         tasks = torch.randint(0, 2, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
         self.targets = torch.randint(0, self.n_landmarks, (self.n_agents,1))
         self.targets[tasks == 1] = -1
         flat_targets = self.targets.view(-1)
         goal_pos = self.landmark_pos[flat_targets.long()]
         goal_pos[flat_targets == -1] = self.initial_pos[flat_targets == -1]
-        self.goals = torch.cat([tasks, goal_pos], dim = 1)
+        self.goals = torch.cat([tasks, goal_pos], dim = 1) #NB: the goals are the POSITIONS of the goal
 
         self.velocities = torch.zeros((self.n_agents, 2))
 
@@ -101,7 +103,7 @@ class EmergentEnv(gym.Env):
     def step(self, x):
         actions, utterances, delta_memories = x
         self.utterances = utterances
-        self.memories = nn.Tanh()(self.memories + delta_memories + 1E-8)
+        self.memories = nn.Tanh()(self.memories + delta_memories + 1E-8)  #why the tanh?
 
         # Transition dynamics. STEP SIZE is delta_t and DAMPING is damping factor
         self.agent_pos += self.velocities * STEP_SIZE

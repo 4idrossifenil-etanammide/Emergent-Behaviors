@@ -28,12 +28,13 @@ class ActorCritic(nn.Module):
         actions_means, actions_log_std, utterances_logits, delta_memories, physical_features, utterances_features = self.actor(physical, utterances, memories, tasks)
 
         next_utterances = F.gumbel_softmax(utterances_logits, tau=1.0, hard=True)
+        #critic should be evaluating actor's action
         return actions_means, actions_log_std, next_utterances, delta_memories, self.critic(torch.cat([physical_features, utterances_features, memories, tasks], dim = 1)) # TODO check critic input
 
 class PPO:
     def __init__(self, state_dim, lr=3e-4, gamma=0.99, clip_epsilon=0.2):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.policy = ActorCritic(state_dim).to(self.device)
+        self.policy = ActorCritic().to(self.device)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
         self.gamma = gamma
         self.clip_epsilon = clip_epsilon
