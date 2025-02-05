@@ -12,7 +12,7 @@ class ActorCritic(nn.Module):
         self.actor = Actor(hidden_dim)
 
         self.critic = nn.Sequential(
-            nn.Linear(hidden_dim*2 + environment.MEMORY_SIZE + 3, hidden_dim),
+            nn.Linear(2 + hidden_dim*2 + environment.MEMORY_SIZE + 3, hidden_dim),
             nn.Tanh(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
@@ -27,9 +27,11 @@ class ActorCritic(nn.Module):
 
         actions_means, actions_log_std, utterances_logits, delta_memories, physical_features, utterances_features = self.actor(physical, utterances, memories, tasks)
 
+        action_std = torch.exp(actions_log_std)
+        dist = Normal(actions_means, action_std) #removed an unsqueeze here
+        actions = dist.sample()
         next_utterances = F.gumbel_softmax(utterances_logits, tau=1.0, hard=True)
-        #critic should be evaluating actor's action
-        return actions_means, actions_log_std, next_utterances, delta_memories, self.critic(torch.cat([physical_features, utterances_features, memories, tasks], dim = 1)) # TODO check critic input
+        return actions_means, actions_log_std, next_utterances, delta_memories, self.critic(torch.cat([actions, physical_features, utterances_features, memories, tasks], dim = 1)), actions 
 
 class PPO:
     def __init__(self, state_dim, lr=3e-4, gamma=0.99, clip_epsilon=0.2):
@@ -46,7 +48,7 @@ class PPO:
         advantages = torch.FloatTensor(advantages).to(self.device)
 
         # Compute new log probabilities
-        means, log_std, utterances, _, values = self.policy(states) # TODO implement utterances loss
+        means, log_std, utterances, _, values, _ = self.policy(states) # TODO implement utterances loss
         stds = torch.exp(log_std)
         dist = Normal(means, stds)
         new_log_probs = dist.log_prob(actions).sum(-1)

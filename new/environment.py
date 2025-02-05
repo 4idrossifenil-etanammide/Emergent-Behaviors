@@ -7,7 +7,7 @@ import gymnasium as gym
 
 WORLD_SIZE = 2.0
 STEP_SIZE = 0.3
-DAMPING = 0.5
+DAMPING = 0.2
 
 MAX_STEPS = 50
 
@@ -84,7 +84,8 @@ class EmergentEnv(gym.Env):
         for agent_idx in range(self.n_agents):
             pos.append(
                 torch.cat([
-                    torch.cat([self.agent_pos - self.agent_pos[agent_idx, :], self.landmark_pos - self.agent_pos[agent_idx, :]], dim = 0), # shape [n_agent + n_landmark, 2]
+                    torch.cat([self.agent_pos, self.landmark_pos], dim = 0), # shape [n_agent + n_landmark, 2]
+                    #torch.cat([self.agent_pos - self.agent_pos[agent_idx, :], self.landmark_pos - self.agent_pos[agent_idx, :]], dim = 0), # shape [n_agent + n_landmark, 2]
                     torch.cat([self.velocities, torch.zeros((self.n_landmarks, 2))], dim = 0), # shape [n_agent + n_landmark, 2]
                     torch.cat([self.agent_color, self.landmark_color], dim = 0), # shape [n_agent + n_landmark , 1]
                     torch.cat([self.agent_shape, self.landmark_shape], dim = 0) # shape [n_agent + n_landmark, 1]
@@ -118,15 +119,17 @@ class EmergentEnv(gym.Env):
         distances = torch.norm(self.agent_pos - self.goals[:, 1:], dim=1)
 
         truncated = self.current_step >= MAX_STEPS
-        terminated = (distances < 0.05).all()
+        terminated = False
+        #terminated = (distances < 0.05).all()
         
         rewards = []
         for i in range(self.n_agents):
             dist = distances[i].item()
             action_norm = torch.norm(actions[i]).item()
-            reward = -dist - 0.1 * action_norm 
-            if dist < 0.05:
-                reward += 2.0
+            reward = -dist - 0.5 * action_norm  #todo, change reward to be confronted with previous one
+            reward = -dist
+            if dist < 0.1:
+                reward += 1.0
             rewards.append(reward)
 
         observation = self._get_state()
