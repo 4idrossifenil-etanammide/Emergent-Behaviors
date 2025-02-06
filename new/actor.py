@@ -10,24 +10,30 @@ class Actor(nn.Module):
         self.action_net = nn.Sequential(
             nn.Linear(hidden_dim + environment.MEMORY_SIZE + 3, hidden_dim),
             nn.Tanh(),
+            nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
+            nn.Tanh(),  #Note, tanhing probability distributions (utterance action)
+            nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, 2 + 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE)
         )
 
         self.physical_processor = nn.Sequential(
             nn.Linear(6, hidden_dim),
             nn.Tanh(),
+            nn.LayerNorm(hidden_dim),  #this jump in dimensions might be too big?
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
+            nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, hidden_dim)
         )
 
         self.utterance_processor = nn.Sequential(
             nn.Linear(environment.VOCAB_SIZE + environment.MEMORY_SIZE, hidden_dim),
             nn.Tanh(),
+            nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
+            nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, hidden_dim)
         )
         

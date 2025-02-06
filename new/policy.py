@@ -14,8 +14,10 @@ class ActorCritic(nn.Module):
         self.critic = nn.Sequential(
             nn.Linear(2 + hidden_dim*2 + environment.MEMORY_SIZE + 3, hidden_dim),
             nn.Tanh(),
+            nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),
+            nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, 1)
         )
 
