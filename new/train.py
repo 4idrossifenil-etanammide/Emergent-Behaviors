@@ -7,6 +7,8 @@ import environment
 
 VISUALIZE_EVERY = 200
 
+GAMMA = 0.95
+
 def train():
     gym.register(
         id="Emergent-v0",
@@ -15,7 +17,7 @@ def train():
 
     env = gym.make("Emergent-v0", render_env=True)
     state_dim = 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE + 1 # 2 because position are bidimensional, 1 because goal is a scalar
-    agent = PPO(state_dim)
+    agent = PPO(state_dim, gamma = GAMMA)
     
     episode = 0
     while True:
