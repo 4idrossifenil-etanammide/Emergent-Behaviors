@@ -12,7 +12,7 @@ class ActorCritic(nn.Module):
         self.actor = Actor(hidden_dim)
 
         self.critic = nn.Sequential(
-            nn.Linear(2 + hidden_dim*2 + environment.MEMORY_SIZE + 3, hidden_dim),
+            nn.Linear(hidden_dim*2 + environment.MEMORY_SIZE + 3, hidden_dim),
             nn.Tanh(),
             nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, hidden_dim),
@@ -34,7 +34,7 @@ class ActorCritic(nn.Module):
         actions = dist.sample()
         next_utterances = F.gumbel_softmax(utterances_logits, tau=1.0, hard=True)
         #critic should be evaluating actor's action
-        return actions_means, actions_log_std, next_utterances, delta_memories, self.critic(torch.cat([actions, physical_features, utterances_features, memories, tasks], dim = 1)), actions 
+        return actions_means, actions_log_std, next_utterances, delta_memories, self.critic(torch.cat([physical_features, utterances_features, memories, tasks], dim = 1)), actions 
 
 class PPO:
     def __init__(self, state_dim, lr=3e-4, gamma=0.99, clip_epsilon=0.2):

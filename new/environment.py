@@ -7,9 +7,9 @@ import gymnasium as gym
 
 WORLD_SIZE = 2.0
 STEP_SIZE = 0.1
-DAMPING = 0.4
+DAMPING = 0.5
 
-MAX_STEPS = 70
+MAX_STEPS = 80
 
 NUM_COLORS = 8
 NUM_SHAPES = 8
@@ -57,7 +57,7 @@ class EmergentEnv(gym.Env):
         self.memories = torch.zeros((self.n_agents, MEMORY_SIZE)).to(device)
 
         #task initialization
-        tasks = torch.randint(1, 2, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
+        tasks = torch.randint(0, 2, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
         self.targets = torch.randint(0, self.n_landmarks, (self.n_agents,1))
         self.targets[tasks == 1] = -1
         flat_targets = self.targets.view(-1)
@@ -93,7 +93,7 @@ class EmergentEnv(gym.Env):
             )
         
         relative_goals = self.goals.clone()
-        relative_goals[:,1:] = self.goals[:,1:] - self.agent_pos[:,1:]
+        relative_goals[:,1:] = self.goals[:,1:] - self.agent_pos
 
         physical = torch.cat(pos, dim=0) # shape [n_agent, n_agent + n_landmark, 6]
         state = {
@@ -120,6 +120,7 @@ class EmergentEnv(gym.Env):
             self.states_traj.append(self.agent_pos.clone())
             self.utterances_traj.append(self.utterances.clone())
 
+        start_distances = torch.norm(self.initial_pos - self.goals[:,1:], dim = 1)
         distances = torch.norm(self.agent_pos - self.goals[:, 1:], dim=1)
 
         truncated = self.current_step >= MAX_STEPS
@@ -132,10 +133,12 @@ class EmergentEnv(gym.Env):
             action_norm = torch.norm(actions[i]).item()
             reward = delta_dist - 0.0 * action_norm  #todo, change reward to be confronted with previous one
             #reward = delta_dist
-            if truncated and distances[i] < 0.05:
-                reward += 1.0
+            if truncated and distances[i] < 0.15:
+                reward = start_distances[i].item() - distances[i].item()
+                reward += 2.0
+                print("hooraaay")
             elif truncated:
-                reward -= 1.0
+                reward = start_distances[i].item() - distances[i].item()
 
             rewards.append(reward)
 

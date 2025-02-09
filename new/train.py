@@ -7,7 +7,7 @@ import environment
 
 VISUALIZE_EVERY = 200
 
-GAMMA = 0.95
+GAMMA = 0.9
 
 def train():
     gym.register(
@@ -93,7 +93,7 @@ def train():
         agent.update(all_states, all_actions, all_old_log_probs, all_returns, all_advantages)
 
         if episode % VISUALIZE_EVERY == 0:
-            total_reward = sum(sum(r) for r in agent_rewards)
+            total_reward = sum(sum(r) for r in agent_rewards) / n_agents
             print(f"Episode {episode}, Total Reward: {total_reward:.2f}")
             env.render()
         
