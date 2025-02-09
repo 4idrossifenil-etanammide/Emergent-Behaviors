@@ -2,3 +2,4 @@ epygame
 torch
 numpy
 gymnasium
+matplotlib

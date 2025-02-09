@@ -5,7 +5,11 @@ from policy import PPO
 from environment import EmergentEnv
 import environment
 
+import matplotlib.pyplot as plt
+
 VISUALIZE_EVERY = 200
+PLOT_EVERY = 200
+MAX_PLOT = 10000
 
 GAMMA = 0.9
 
@@ -18,6 +22,7 @@ def train():
     env = gym.make("Emergent-v0", render_env=True)
     state_dim = 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE + 1 # 2 because position are bidimensional, 1 because goal is a scalar
     agent = PPO(state_dim, gamma = GAMMA)
+    rewards_history = []
     
     episode = 0
     while True:
@@ -91,11 +96,23 @@ def train():
 
         all_states = {k: torch.cat(v, dim=0) for k,v in agent_states.items()}
         agent.update(all_states, all_actions, all_old_log_probs, all_returns, all_advantages)
+        total_reward = sum(sum(r) for r in agent_rewards) / n_agents
+        rewards_history.append(total_reward)
+
 
         if episode % VISUALIZE_EVERY == 0:
-            total_reward = sum(sum(r) for r in agent_rewards) / n_agents
             print(f"Episode {episode}, Total Reward: {total_reward:.2f}")
             env.render()
+
+        if episode % PLOT_EVERY == 0:
+            plt.figure(figsize=(10,5))
+            plt.plot(rewards_history)
+            plt.title('Total Reward per episode')
+            plt.xlabel('Episode')
+            plt.ylabel('Total Reward')
+            plt.grid(True)
+            plt.savefig('rewards_plot.png')
+            plt.close()
         
         episode += 1
 
