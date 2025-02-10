@@ -48,7 +48,7 @@ class PPO:
     def update(self, states, actions, old_log_probs, returns, advantages):
         actions = torch.FloatTensor([a.tolist() for a in actions]).to(self.device)
         old_log_probs = torch.FloatTensor(old_log_probs).to(self.device).detach()
-        returns = torch.FloatTensor(returns).to(self.device)
+        returns = returns.to(self.device)
         advantages = torch.FloatTensor(advantages).to(self.device)
 
         c1=0.5
@@ -67,7 +67,7 @@ class PPO:
         # Value loss
         value_loss = F.mse_loss(returns, values.squeeze())
 
-        total_loss = policy_loss -  c1*value_loss  + c2*entropy
+        total_loss = policy_loss +  c1*value_loss  + c2*entropy
 
         self.optimizer.zero_grad()
         total_loss.backward()

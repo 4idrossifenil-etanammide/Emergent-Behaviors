@@ -57,7 +57,7 @@ class EmergentEnv(gym.Env):
         self.memories = torch.zeros((self.n_agents, MEMORY_SIZE)).to(device)
 
         #task initialization
-        tasks = torch.randint(0, 1, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
+        tasks = torch.randint(1, 2, (self.n_agents, 1)) # 0 - GOTO; 1 - DO NOTHING
         self.targets = torch.randint(0, self.n_landmarks, (self.n_agents,1))
         self.targets[tasks == 1] = -1
         flat_targets = self.targets.view(-1)
@@ -107,6 +107,7 @@ class EmergentEnv(gym.Env):
     def step(self, x):
         actions, utterances, delta_memories = x
         self.utterances = utterances
+        #momentarily ignore memories
         #self.memories = nn.Tanh()(self.memories + delta_memories + 1E-8)  #why the tanh?
         self.memories= self.memories
         prev_distances = torch.norm(self.agent_pos - self.goals[:, 1:], dim=1)
@@ -136,13 +137,13 @@ class EmergentEnv(gym.Env):
             #reward = delta_dist
             reward = 0
             if distances[i] < 0.15:
-                reward += 0.1
+                reward += 0.0
             if truncated and distances[i] < 0.15:
                 reward = start_distances[i].item() - distances[i].item()
                 reward += 2.0
                 print("hooraaay")
             elif truncated:
-                reward = distances[i].item()*0.2
+                reward = -distances[i].item()*0.4
 
             rewards.append(reward)
 
