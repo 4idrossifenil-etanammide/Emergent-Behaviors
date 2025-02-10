@@ -14,7 +14,7 @@ class Actor(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.Tanh(),  #Note, tanhing probability distributions (utterance action)
             nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, 2 + 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE)
+            nn.Linear(hidden_dim, 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE)
         )
 
         self.physical_processor = nn.Sequential(
@@ -56,10 +56,9 @@ class Actor(nn.Module):
         
         output = self.action_net(torch.cat([physical_features, memories, tasks], dim=1))
         actions_means = nn.Tanh()(output[:, :2])
-        action_log_std = output[:, 2:4]
-        utterances_logits = output[:, 4: 4 + environment.VOCAB_SIZE]
-        delta_memories = output[:, 4 + environment.VOCAB_SIZE:]
-        return actions_means, action_log_std, utterances_logits, delta_memories, physical_features, utterances_features
+        utterances_logits = output[:, 2: 2 + environment.VOCAB_SIZE]
+        delta_memories = output[:, 2 + environment.VOCAB_SIZE:]
+        return actions_means, utterances_logits, delta_memories, physical_features, utterances_features
 
 class SoftmaxPooling(nn.Module):
     def __init__(self, dim, temperature = 1.0):

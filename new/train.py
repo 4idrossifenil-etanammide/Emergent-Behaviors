@@ -46,9 +46,8 @@ def train():
 
         while not (terminated or truncated):
             with torch.no_grad():
-                action_mean, action_log_std, utterances, delta_memories, values, actions = agent.policy({k:v.to(agent.device) for k,v in state.items()})
-                action_std = torch.exp(action_log_std)
-                dist = Normal(action_mean, action_std) #removed an unsqueeze here
+                dist, utterances, delta_memories, values= agent.policy({k:v.to(agent.device) for k,v in state.items()})
+                actions = dist.sample()
                 log_probs = dist.log_prob(actions.to(agent.device)).sum(dim=-1)
                 log_probs = log_probs.view(-1)
 
@@ -86,8 +85,8 @@ def train():
             values_tensor = torch.FloatTensor(values)
             advantages = returns - values_tensor
             # DO NOT REMOVE CORRECTION = 0
-            advantages = (advantages - advantages.mean()) / (advantages.std(correction = 0) + 1e-8) 
-            returns = (returns - returns.mean()) / (returns.std(correction = 0) + 1e-8)
+            #advantages = (advantages - advantages.mean()) / (advantages.std(correction = 0) + 1e-8) 
+            #returns = (returns - returns.mean()) / (returns.std(correction = 0) + 1e-8)
 
             all_actions.extend(agent_actions[i])
             all_old_log_probs.extend(agent_old_log_probs[i])
