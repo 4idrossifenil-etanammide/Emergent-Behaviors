@@ -46,7 +46,7 @@ class PPO:
         self.clip_epsilon = clip_epsilon
 
     def update(self, states, actions, old_log_probs, returns, advantages):
-        actions = torch.FloatTensor([a.tolist() for a in actions]).to(self.device)
+        actions = actions.to(self.device)
         old_log_probs = torch.FloatTensor(old_log_probs).to(self.device).detach()
         returns = returns.to(self.device)
         advantages = torch.FloatTensor(advantages).to(self.device)

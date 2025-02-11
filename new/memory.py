@@ -50,6 +50,10 @@ class Memory():
     #return the rewards for a single agent
         return self.rewards[episode][agent_index]
     
+    def get_rewards_ep(self,episode):
+    #return all of the rewards in a single episode
+        return self.rewards[episode]
+    
     def get_values(self, episode, agent_index):
     #return the values for a single agent
         return self.values[episode][agent_index]
@@ -59,8 +63,20 @@ class Memory():
         return self.agent_states[episode]
     
     def get_returns(self, episode, agent_index):
-    #return the returns for the current episode
+    #return the returns of an agent for the current episode
         return self.returns[episode][agent_index]
+    
+    def get_actions(self,episode, agent_index):
+    #return the action of an agent for the current episode
+        return self.actions[episode][agent_index]
+    
+    def get_old_log_probs(self,episode,agent_index):
+    #return the old log probs of an agent for the current episode
+        return self.old_log_probs[episode][agent_index]
+    
+    def get_advantages(self,episode,agent_index):
+    #return the advantages of an agent for the current episode
+        return self.advantages[episode][agent_index]
     
 
     

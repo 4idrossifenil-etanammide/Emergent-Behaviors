@@ -34,18 +34,7 @@ def train():
 
         terminated, truncated = False, False
 
-        agent_states = {
-            "physical": [],
-            "utterances": [],
-            "memories": [],
-            "tasks": []
-        } ###
-
         trainingMemory.add_episode(n_agents)
-        agent_actions = [[] for _ in range(n_agents)]###
-        agent_rewards = [[] for _ in range(n_agents)]###
-        agent_old_log_probs = [[] for _ in range(n_agents)]###
-        agent_values = [[] for _ in range(n_agents)]###
 
         while not (terminated or truncated):
             with torch.no_grad():
@@ -58,23 +47,10 @@ def train():
             
             for i in range(n_agents):
                 trainingMemory.add_step(i, actions[i].cpu().numpy(), rewards[i], log_probs[i].item(), values[i].item())
-                agent_actions[i].append(actions[i].cpu().numpy())###
-                agent_rewards[i].append(rewards[i])###
-                agent_old_log_probs[i].append(log_probs[i].item())###
-                agent_values[i].append(values[i].item())###
 
             trainingMemory.add_step_state(state, agent)
-            agent_states["physical"].append(state["physical"].to(agent.device))###
-            agent_states["utterances"].append(state["utterances"].to(agent.device))###
-            agent_states["memories"].append(state["memories"].to(agent.device))###
-            agent_states["tasks"].append(state["tasks"].to(agent.device))###
 
             state = next_state
-
-        all_actions = [] ###
-        all_old_log_probs = []###
-        all_returns = []###
-        all_advantages = []###
 
         for i in range(n_agents):
             rewards = trainingMemory.get_reward(episode, i)
@@ -93,15 +69,16 @@ def train():
             advantages = (advantages - advantages.mean()) / (advantages.std(correction = 0) + 1e-8) 
             returns = (returns - returns.mean()) / (returns.std(correction = 0) + 1e-8)
 
-            all_actions.extend(agent_actions[i])
-            all_old_log_probs.extend(agent_old_log_probs[i])
-            all_advantages.extend(advantages.tolist())###
             trainingMemory.add_objective_functions(i, returns.tolist(), advantages.tolist())
 
         all_states = {k: torch.cat(v, dim=0) for k,v in trainingMemory.get_states(episode).items()}
+        all_actions = torch.cat([ torch.Tensor(trainingMemory.get_actions(episode, i)) for i in range(n_agents)])
+        all_old_log_probs = torch.cat([ torch.Tensor(trainingMemory.get_old_log_probs(episode, i)) for i in range(n_agents)])
         all_returns = torch.cat([ torch.Tensor(trainingMemory.get_returns(episode,i)) for i in range(n_agents)])
-        #print(torch.equal(all_returns2, torch.FloatTensor(all_returns)))
+        all_advantages = torch.cat([ torch.Tensor(trainingMemory.get_advantages(episode,i)) for i in range(n_agents)])
         agent.update(all_states, all_actions, all_old_log_probs, all_returns, all_advantages)
+        
+        agent_rewards = trainingMemory.get_rewards_ep(episode)
         total_reward = sum(sum(r) for r in agent_rewards) / n_agents
         rewards_history.append(total_reward)
 
