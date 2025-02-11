@@ -13,11 +13,11 @@ class ActorCritic(nn.Module):
 
         self.critic = nn.Sequential(
             nn.Linear(hidden_dim*2 + environment.MEMORY_SIZE + 3, hidden_dim),
-            nn.Tanh(),
             nn.LayerNorm(hidden_dim),
+            nn.LeakyReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
             nn.LayerNorm(hidden_dim),
+            nn.LeakyReLU(),
             nn.Linear(hidden_dim, 1)
         )
 
@@ -46,6 +46,7 @@ class PPO:
         self.clip_epsilon = clip_epsilon
 
     def update(self, states, actions, old_log_probs, returns, advantages):
+        #print(type)
         actions = actions.to(self.device)
         old_log_probs = torch.FloatTensor(old_log_probs).to(self.device).detach()
         returns = returns.to(self.device)

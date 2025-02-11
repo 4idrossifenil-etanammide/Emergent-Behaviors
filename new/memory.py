@@ -46,7 +46,7 @@ class Memory():
         self.advantages[-1][agent_index] = advantage
         return
     
-    def get_reward(self, episode, agent_index):
+    def get_rewards(self, episode, agent_index):
     #return the rewards for a single agent
         return self.rewards[episode][agent_index]
     

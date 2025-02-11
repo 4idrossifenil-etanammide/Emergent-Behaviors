@@ -9,31 +9,32 @@ class Actor(nn.Module):
         super().__init__()
         self.action_net = nn.Sequential(
             nn.Linear(hidden_dim + environment.MEMORY_SIZE + 3, hidden_dim),
-            nn.Tanh(),
             nn.LayerNorm(hidden_dim),
+            nn.LeakyReLU(),
             nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),  #Note, tanhing probability distributions (utterance action)
             nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE)
+            nn.LeakyReLU(),
+            nn.Linear(hidden_dim, 2 + environment.VOCAB_SIZE + environment.MEMORY_SIZE),
+            nn.Tanh()
         )
 
         self.physical_processor = nn.Sequential(
-            nn.Linear(6, hidden_dim),
-            nn.Tanh(),
-            nn.LayerNorm(hidden_dim),  #this jump in dimensions might be too big?
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
+            nn.Linear(6, hidden_dim//2),
+            nn.LayerNorm(hidden_dim//2),
+            nn.LeakyReLU(),
+            nn.Linear(hidden_dim//2, hidden_dim),
             nn.LayerNorm(hidden_dim),
+            nn.LeakyReLU(),
             nn.Linear(hidden_dim, hidden_dim)
         )
 
         self.utterance_processor = nn.Sequential(
-            nn.Linear(environment.VOCAB_SIZE + environment.MEMORY_SIZE, hidden_dim),
-            nn.Tanh(),
+            nn.Linear(environment.VOCAB_SIZE + environment.MEMORY_SIZE, hidden_dim//2),
+            nn.LayerNorm(hidden_dim//2),
+            nn.LeakyReLU(),
+            nn.Linear(hidden_dim//2, hidden_dim),
             nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Tanh(),
-            nn.LayerNorm(hidden_dim),
+            nn.LeakyReLU(),
             nn.Linear(hidden_dim, hidden_dim)
         )
         
@@ -42,7 +43,7 @@ class Actor(nn.Module):
         num_agents, num_land_agents, dim = physical.shape
         physical_features = self.physical_processor(physical.view(-1, dim))
         physical_features = physical_features.view(num_agents, num_land_agents, -1)
-        physical_features = SoftmaxPooling(dim=1)(physical_features) # shape: (n_agents, 256)
+        physical_features = SoftmaxPooling(dim=-2)(physical_features) # shape: (n_agents, 256)
 
         #CAREFUL, fixed this, abbiamo comunque bisogno di n*2 utterance features da softmaxare
         # utterance ripetute lungo la prima dimensione per avere n copie delle utterance da dare agli n agenti
@@ -50,12 +51,12 @@ class Actor(nn.Module):
         #  n_agents tensori, ciascuno con una memoria ripetuta n_agents volte (la stessa memoria
         #  va applicata a tutti i canali di comunicazione per ciascun agente)
         utterances_input = torch.cat([utterances.repeat(num_agents, 1, 1) , 
-                                      memories.repeat(1,num_agents).view(num_agents, num_agents, -1)], dim = 2)
+                                      memories.repeat(1,num_agents).view(num_agents, num_agents, -1)], dim = 2) #change this dim to go from the right
         utterances_features = self.utterance_processor(utterances_input)
-        utterances_features = SoftmaxPooling(dim=1)(utterances_features)
+        utterances_features = SoftmaxPooling(dim=-2)(utterances_features)
         
-        output = self.action_net(torch.cat([physical_features, memories, tasks], dim=1))
-        actions_means = nn.Tanh()(output[:, :2])
+        output = self.action_net(torch.cat([physical_features, memories, tasks], dim=-1))
+        actions_means = output[:, :2]
         utterances_logits = output[:, 2: 2 + environment.VOCAB_SIZE]
         delta_memories = output[:, 2 + environment.VOCAB_SIZE:]
         return actions_means, utterances_logits, delta_memories, physical_features, utterances_features

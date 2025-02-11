@@ -109,6 +109,7 @@ class EmergentEnv(gym.Env):
         self.utterances = utterances
         #momentarily ignore memories
         #self.memories = nn.Tanh()(self.memories + delta_memories + 1E-8)  #why the tanh?
+        #eventually make epsilon zero mean gaussian noise
         self.memories= self.memories
         prev_distances = torch.norm(self.agent_pos - self.goals[:, 1:], dim=1)
 

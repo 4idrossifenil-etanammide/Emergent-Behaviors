@@ -8,11 +8,11 @@ import memory
 
 import matplotlib.pyplot as plt
 
-VISUALIZE_EVERY = 50
+VISUALIZE_EVERY = 200
 PLOT_EVERY = 100
 MAX_PLOT = 10000
 
-GAMMA = 0.9
+GAMMA = 0.8
 
 def train():
     gym.register(
@@ -53,7 +53,7 @@ def train():
             state = next_state
 
         for i in range(n_agents):
-            rewards = trainingMemory.get_reward(episode, i)
+            rewards = trainingMemory.get_rewards(episode, i)
             values = trainingMemory.get_values(episode, i)
 
             returns = []
@@ -66,8 +66,8 @@ def train():
             values_tensor = torch.FloatTensor(values)
             advantages = returns - values_tensor
             # DO NOT REMOVE CORRECTION = 0
-            advantages = (advantages - advantages.mean()) / (advantages.std(correction = 0) + 1e-8) 
-            returns = (returns - returns.mean()) / (returns.std(correction = 0) + 1e-8)
+            #advantages = (advantages - advantages.mean()) / (advantages.std(correction = 0) + 1e-8) 
+            #returns = (returns - returns.mean()) / (returns.std(correction = 0) + 1e-8)
 
             trainingMemory.add_objective_functions(i, returns.tolist(), advantages.tolist())
 
