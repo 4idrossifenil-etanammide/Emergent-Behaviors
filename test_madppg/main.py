@@ -27,14 +27,14 @@ if __name__ == "__main__":
     critic_dims = sum(actor_dims)
     n_actions = env.action_space.shape[-1]
 
+    lr = 1E-3
     maddpg_agents = MADDPG(actor_dims, critic_dims, n_agents, n_actions, fc1=64, fc2=64,
-                           alpha = 0.01, beta = 0.01, scenario = scenario, chkpt_dir = ".")
+                           alpha = lr, beta = lr, scenario = scenario, chkpt_dir = ".")
     
     memory = MultiAgentReplayBuffer(1000000, critic_dims, actor_dims, n_actions, n_agents, batch_size=1024)
 
     PRINT_INTERVAL = 10
     N_GAMES = 30000
-    MAX_STEPS = 25
     total_steps = 0
     score_history = []
     best_score = 0

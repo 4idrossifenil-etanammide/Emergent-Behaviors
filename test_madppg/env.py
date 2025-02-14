@@ -18,18 +18,14 @@ class MultiAgentCommEnv(gym.Env):
         self.step_count = 0
         
         # Define color landmarks (RGB)
-        self.landmark_colors = np.array([
-            [1, 0, 0],  # Red
-            [0, 1, 0],  # Green
-            [0, 0, 1]   # Blue
-        ])
+        self.landmark_colors = np.array([1,2,3])
+        self.colors = [(255,0,0), (0,255,0), (0,0,255)]
         
         # Define action spaces (movement + communication)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, 2 + VOCAB_SIZE), dtype=np.float32)
-        self.obs_size = 2 + (3*2) + 3 + VOCAB_SIZE  # vel + 3 landmarks * 2D + target color + comm
+        self.obs_size = (3*2) + 1 + (self.num_agents - 1) * VOCAB_SIZE  # 3 landmarks * 2D + target color + (n - 1 agents) comm
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2, self.obs_size), dtype=np.float32)
         self.agent_positions = None
-        self.agent_velocities = None
         self.landmark_positions = None
         self.communications = np.zeros((2, VOCAB_SIZE))
 
@@ -37,15 +33,16 @@ class MultiAgentCommEnv(gym.Env):
     def reset(self, seed=None, options=None):
         # Initialize agents and landmarks randomly
         self.agent_positions = np.random.uniform(-1, 1, size=(2, 2))
-        self.agent_velocities = np.zeros((2, 2))
         self.landmark_positions = np.random.uniform(-1, 1, size=(3, 2))
         self.step_count = 0
         
         # Reset communications
-        self.communications = np.zeros((2, VOCAB_SIZE))
+        self.communications = np.zeros((self.num_agents, VOCAB_SIZE))
         self.goals = np.random.choice(self.num_landmarks, self.num_agents)
+        self.agent_goals = np.array([1,0]) # TODO: Permute over all the possible agents. For now agent 0 has agent 1 and viceversa
 
         self.trajectories = [self.agent_positions.copy()]
+        self.communications_traj = [self.communications.copy()]
         
         return self._get_obs(), {}
     
@@ -53,24 +50,26 @@ class MultiAgentCommEnv(gym.Env):
         obs = np.zeros((2, self.obs_size))
         
         for i in range(self.num_agents):
-            # Velocity (2D)
-            velocity = self.agent_velocities[i]
             
             # Relative positions to landmarks (3 landmarks * 2D)
             rel_positions = (self.landmark_positions - self.agent_positions[i]).flatten()
             
             # Target color (3D)
-            target_color = self.landmark_colors[self.goals[i]]
-            
-            # Received communication (3D)
-            # TODO Change this to the other agent comm or use both
-            comm = self.communications[i]
+            #target_color = self.landmark_colors[self.goals[i]] # An agent doesn't have to see it's own color, but rather the others target color
+            other_agent = self.agent_goals[i]
+            target_color = self.landmark_colors[self.goals[other_agent]]
+
+            comm = []
+            for j in range(self.num_agents):
+                if i != j:
+                    comm.append(self.communications[j])
+
+            comm = np.concatenate(comm)
             
             # Concatenate observations
             obs[i] = np.concatenate([
-                velocity,
                 rel_positions,
-                target_color,
+                np.array([target_color]),
                 comm
             ])
             
@@ -80,13 +79,14 @@ class MultiAgentCommEnv(gym.Env):
         self.step_count += 1
         
         # Update positions
-        self.agent_positions += actions[:, :2] * 0.1
+        self.agent_positions = self.agent_positions + actions[:, :2] * 0.1
         self.communications = actions[:, 2:]
         
         self.trajectories.append(self.agent_positions.copy())
+        self.communications_traj.append(self.communications.copy())
 
         # Calculate rewards
-        rewards = np.zeros((2))
+        rewards = np.zeros((self.num_agents))
         for i in range(self.num_agents):
             target_pos = self.landmark_positions[self.goals[i]]
             distance = np.linalg.norm(self.agent_positions[i] - target_pos)
@@ -112,7 +112,7 @@ class MultiAgentCommEnv(gym.Env):
         for i in range(1, len(self.trajectories)+1):
             screen.fill((255, 255, 255))
             for k, landmark in enumerate(landmarks_scaled):
-                pygame.draw.circle(screen, [int(x) for x in self.landmark_colors[k] * 255], landmark, 10)
+                pygame.draw.circle(screen, self.colors[k], landmark, 10)
                 text = font.render(str(k), True, (0,0,0))
                 screen.blit(text, (landmark[0] - text.get_width() // 2, landmark[1] - text.get_height() // 2))
             
@@ -122,12 +122,17 @@ class MultiAgentCommEnv(gym.Env):
                     pygame.draw.circle(screen, (169, 131, 7), traj[i - 1], 5) # Dark yellow agents
                     text = font.render(str(self.goals[j]), True, (0, 0, 0))
                     screen.blit(text, (traj[i - 1][0] - text.get_width() // 2, traj[i - 1][1] - 20))
+
+                    comm_index = np.argmax(self.communications_traj[i-1][j])
+                    comm_text = font.render(str(comm_index), True, (72,72,72))
+                    screen.blit(comm_text, (traj[i-1][0] - comm_text.get_width() // 2, traj[i-1][1] + 20))
+
                 if i > 1 and len(traj) >= 1:
                     #pygame.draw.lines(screen, self.colors_map[self.agent_color[j].item()], False, traj[:i], 2)
                     pass
             
             pygame.display.flip()
-            clock.tick(20)
+            clock.tick(10)
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
