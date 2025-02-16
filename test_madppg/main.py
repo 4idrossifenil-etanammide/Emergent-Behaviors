@@ -37,7 +37,7 @@ if __name__ == "__main__":
     N_GAMES = 30000
     total_steps = 0
     score_history = []
-    best_score = 0
+    best_score = 1E10 #TODO Change this to -inf
 
     evaluate = False
     if evaluate:

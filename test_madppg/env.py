@@ -14,7 +14,7 @@ class MultiAgentCommEnv(gym.Env):
         self.world_size = 2.0  # Size of the square world
         self.num_agents = 2
         self.num_landmarks = 3
-        self.episode_length = 100
+        self.episode_length = 25
         self.step_count = 0
         
         # Define color landmarks (RGB)
@@ -43,6 +43,8 @@ class MultiAgentCommEnv(gym.Env):
 
         self.trajectories = [self.agent_positions.copy()]
         self.communications_traj = [self.communications.copy()]
+
+        self.distance_to_target_prev = np.linalg.norm(self.agent_positions - self.landmark_positions[self.goals], axis = 1)
         
         return self._get_obs(), {}
     
@@ -52,7 +54,7 @@ class MultiAgentCommEnv(gym.Env):
         for i in range(self.num_agents):
             
             # Relative positions to landmarks (3 landmarks * 2D)
-            rel_positions = (self.landmark_positions - self.agent_positions[i]).flatten()
+            rel_positions = (self.agent_positions[i] - self.landmark_positions).flatten()
             
             # Target color (3D)
             #target_color = self.landmark_colors[self.goals[i]] # An agent doesn't have to see it's own color, but rather the others target color
@@ -86,11 +88,18 @@ class MultiAgentCommEnv(gym.Env):
         self.communications_traj.append(self.communications.copy())
 
         # Calculate rewards
-        rewards = np.zeros((self.num_agents))
-        for i in range(self.num_agents):
-            target_pos = self.landmark_positions[self.goals[i]]
-            distance = np.linalg.norm(self.agent_positions[i] - target_pos)
-            rewards[i] = -distance  # Reward is negative distance to target
+        #rewards = np.zeros((self.num_agents))
+        distance_to_target = np.linalg.norm(self.agent_positions - self.landmark_positions[self.goals], axis = 1)
+        rewards = self.distance_to_target_prev - distance_to_target
+        self.distance_to_target_prev = distance_to_target.copy()
+        #for i in range(self.num_agents):
+            #target_pos = self.landmark_positions[self.goals[i]]
+            #distance = np.linalg.norm(self.agent_positions[i] - target_pos)
+            #rewards[i] = -distance  # Reward is negative distance to target
+            #if distance < 0.3:
+            #    rewards[i] += 1
+            #if distance < 0.15: # Cumulative reward will be 2
+            #    rewards[i] += 1
         
         # Check termination
         terminated = self.step_count >= self.episode_length

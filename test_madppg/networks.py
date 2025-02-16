@@ -5,6 +5,8 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
+from torch.distributions import Normal
+
 class Critic(nn.Module):
     def __init__(self, beta, input_dims, fc1_dims, fc2_dims, n_agents, n_actions, name, chkpt_dir):
         super(Critic, self).__init__()
@@ -48,6 +50,8 @@ class Actor(nn.Module):
             nn.Tanh()
         )
 
+        self.log_std = nn.Parameter(torch.zeros(2))
+
         self.vocab_net = nn.Sequential(
             nn.Linear(input_dims, fc1_dims),
             nn.ReLU(),
@@ -61,7 +65,10 @@ class Actor(nn.Module):
         self.to(self.device)
 
     def forward(self, state):
-        movement = self.movement_net(state)
+        action_std = torch.exp(self.log_std).clamp(min=1e-6)
+        dist = Normal(self.movement_net(state), action_std)
+        movement = dist.rsample()
+        #movement = self.movement_net(state)
         utterance = self.vocab_net(state)
         utterance = F.gumbel_softmax(utterance, hard=True)
 
