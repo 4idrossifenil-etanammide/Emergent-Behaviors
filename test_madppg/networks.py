@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from torch.distributions import Normal
+import env
 
 class Critic(nn.Module):
     def __init__(self, beta, input_dims, fc1_dims, fc2_dims, n_agents, n_actions, name, chkpt_dir):
@@ -57,7 +58,7 @@ class Actor(nn.Module):
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
             nn.ReLU(),
-            nn.Linear(fc2_dims, n_actions - 2)
+            nn.Linear(fc2_dims, env.VOCAB_SIZE)
         )
 
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
@@ -69,10 +70,12 @@ class Actor(nn.Module):
         dist = Normal(self.movement_net(state), action_std)
         movement = dist.rsample()
         #movement = self.movement_net(state)
-        utterance = self.vocab_net(state)
-        utterance = F.gumbel_softmax(utterance, hard=True)
+        utterance_logits = self.vocab_net(state)
+        utterance_one_hot = F.gumbel_softmax(utterance_logits, hard=True)
 
-        pi = torch.cat([movement, utterance], dim = 1)
+        utterance = torch.sum(utterance_one_hot * torch.arange(utterance_logits.shape[-1]).to(self.device), dim = 1)
+
+        pi = torch.cat([movement, utterance.unsqueeze(1)], dim = 1)
 
         return pi
     

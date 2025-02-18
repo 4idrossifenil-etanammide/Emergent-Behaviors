@@ -22,12 +22,12 @@ class MultiAgentCommEnv(gym.Env):
         self.colors = [(255,0,0), (0,255,0), (0,0,255)]
         
         # Define action spaces (movement + communication)
-        self.action_space = spaces.Box(low=-1, high=1, shape=(2, 2 + VOCAB_SIZE), dtype=np.float32)
-        self.obs_size = (3*2) + 1 + (self.num_agents - 1) * VOCAB_SIZE  # 3 landmarks * 2D + target color + (n - 1 agents) comm
+        self.action_space = spaces.Box(low=-1, high=1, shape=(2, 2 + 1), dtype=np.float32)
+        self.obs_size = (3*2) + 2 + 1 + (self.num_agents - 1)  
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2, self.obs_size), dtype=np.float32)
         self.agent_positions = None
         self.landmark_positions = None
-        self.communications = np.zeros((2, VOCAB_SIZE))
+        self.communications = np.zeros((self.num_agents))
 
 
     def reset(self, seed=None, options=None):
@@ -37,7 +37,7 @@ class MultiAgentCommEnv(gym.Env):
         self.step_count = 0
         
         # Reset communications
-        self.communications = np.zeros((self.num_agents, VOCAB_SIZE))
+        self.communications = np.zeros((self.num_agents))
         self.goals = np.random.choice(self.num_landmarks, self.num_agents)
         self.agent_goals = np.array([1,0]) # TODO: Permute over all the possible agents. For now agent 0 has agent 1 and viceversa
 
@@ -60,11 +60,12 @@ class MultiAgentCommEnv(gym.Env):
             #target_color = self.landmark_colors[self.goals[i]] # An agent doesn't have to see it's own color, but rather the others target color
             other_agent = self.agent_goals[i]
             target_color = self.landmark_colors[self.goals[other_agent]]
+            other_rel_pos = self.agent_positions[other_agent] - self.landmark_positions[self.goals[other_agent]]
 
             comm = []
             for j in range(self.num_agents):
                 if i != j:
-                    comm.append(self.communications[j])
+                    comm.append([self.communications[j]])
 
             comm = np.concatenate(comm)
             
@@ -72,6 +73,7 @@ class MultiAgentCommEnv(gym.Env):
             obs[i] = np.concatenate([
                 rel_positions,
                 np.array([target_color]),
+                other_rel_pos,
                 comm
             ])
             
@@ -82,28 +84,39 @@ class MultiAgentCommEnv(gym.Env):
         
         # Update positions
         self.agent_positions = self.agent_positions + actions[:, :2] * 0.1
-        self.communications = actions[:, 2:]
+        self.communications = actions[:, -1]
         
         self.trajectories.append(self.agent_positions.copy())
         self.communications_traj.append(self.communications.copy())
 
         # Calculate rewards
-        #rewards = np.zeros((self.num_agents))
-        distance_to_target = np.linalg.norm(self.agent_positions - self.landmark_positions[self.goals], axis = 1)
-        rewards = self.distance_to_target_prev - distance_to_target
-        self.distance_to_target_prev = distance_to_target.copy()
-        #for i in range(self.num_agents):
-            #target_pos = self.landmark_positions[self.goals[i]]
-            #distance = np.linalg.norm(self.agent_positions[i] - target_pos)
-            #rewards[i] = -distance  # Reward is negative distance to target
-            #if distance < 0.3:
-            #    rewards[i] += 1
-            #if distance < 0.15: # Cumulative reward will be 2
-            #    rewards[i] += 1
+        #distance_to_target = np.linalg.norm(self.agent_positions - self.landmark_positions[self.goals], axis = 1)
+        #rewards = self.distance_to_target_prev - distance_to_target
+        #self.distance_to_target_prev = distance_to_target.copy()
+        rewards = np.zeros((self.num_agents))
+        for i in range(self.num_agents):
+            distance = np.linalg.norm(self.agent_positions[i] - self.landmark_positions[self.goals[i]])
+            rewards[i] = -distance
+            if distance < 0.3:
+                rewards[i] += 1
+            if distance < 0.25:
+                rewards[i] += 1
+            if distance < 0.2:
+                rewards[i] += 1
+            if distance < 0.15:
+                rewards[i] += 1
+            if distance < 0.1:
+                rewards[i] += 1
+            if distance < 0.05:
+                rewards[i] += 1
         
         # Check termination
-        terminated = self.step_count >= self.episode_length
-        truncated = False
+        truncated = self.step_count >= self.episode_length
+        #terminated = (np.abs(self.agent_positions - self.landmark_positions[self.goals]) < 0.05).all()
+        terminated = np.all([
+            np.linalg.norm(self.agent_positions[i] - self.landmark_positions[self.goals[self.agent_goals[i]]]) < 0.05
+            for i in range(self.num_agents)
+        ])
         
         return self._get_obs(), rewards, terminated, truncated, {}
 
@@ -132,8 +145,8 @@ class MultiAgentCommEnv(gym.Env):
                     text = font.render(str(self.goals[j]), True, (0, 0, 0))
                     screen.blit(text, (traj[i - 1][0] - text.get_width() // 2, traj[i - 1][1] - 20))
 
-                    comm_index = np.argmax(self.communications_traj[i-1][j])
-                    comm_text = font.render(str(comm_index), True, (72,72,72))
+                    comm = self.communications_traj[i-1][j]
+                    comm_text = font.render(str(int(comm)), True, (72,72,72))
                     screen.blit(comm_text, (traj[i-1][0] - comm_text.get_width() // 2, traj[i-1][1] + 20))
 
                 if i > 1 and len(traj) >= 1:
