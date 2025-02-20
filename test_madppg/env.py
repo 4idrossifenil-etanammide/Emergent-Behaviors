@@ -23,7 +23,7 @@ class MultiAgentCommEnv(gym.Env):
         
         # Define action spaces (movement + communication)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, 2 + 1), dtype=np.float32)
-        self.obs_size = (3*2) + 2 + 1 + (self.num_agents - 1)  
+        self.obs_size = (self.num_landmarks*2) + (self.num_agents*2) + 1 + 2 + (self.num_agents - 1)  # 3 landmarks, 2 agents, 1 color, other agent pos, n-1 communications
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2, self.obs_size), dtype=np.float32)
         self.agent_positions = None
         self.landmark_positions = None
@@ -55,6 +55,7 @@ class MultiAgentCommEnv(gym.Env):
             
             # Relative positions to landmarks (3 landmarks * 2D)
             rel_positions = (self.agent_positions[i] - self.landmark_positions).flatten()
+            agents_rel_positions = (self.agent_positions[i] - self.agent_positions).flatten()
             
             # Target color (3D)
             #target_color = self.landmark_colors[self.goals[i]] # An agent doesn't have to see it's own color, but rather the others target color
@@ -72,6 +73,7 @@ class MultiAgentCommEnv(gym.Env):
             # Concatenate observations
             obs[i] = np.concatenate([
                 rel_positions,
+                agents_rel_positions,
                 np.array([target_color]),
                 other_rel_pos,
                 comm
@@ -93,22 +95,27 @@ class MultiAgentCommEnv(gym.Env):
         #distance_to_target = np.linalg.norm(self.agent_positions - self.landmark_positions[self.goals], axis = 1)
         #rewards = self.distance_to_target_prev - distance_to_target
         #self.distance_to_target_prev = distance_to_target.copy()
-        rewards = np.zeros((self.num_agents))
+
+        distance = sum(np.linalg.norm(self.agent_positions - self.landmark_positions[self.goals], axis = 1))
+        rewards = np.repeat(-distance, self.num_agents)
+
+        """rewards = np.zeros((self.num_agents))
         for i in range(self.num_agents):
             distance = np.linalg.norm(self.agent_positions[i] - self.landmark_positions[self.goals[i]])
-            rewards[i] = -distance
-            if distance < 0.3:
-                rewards[i] += 1
-            if distance < 0.25:
-                rewards[i] += 1
-            if distance < 0.2:
-                rewards[i] += 1
-            if distance < 0.15:
-                rewards[i] += 1
-            if distance < 0.1:
-                rewards[i] += 1
-            if distance < 0.05:
-                rewards[i] += 1
+            other_distance = np.linalg.norm(self.agent_positions[self.agent_goals[i]] - self.landmark_positions[self.goals[self.agent_goals[i]]])
+            rewards[i] = - (distance + other_distance)"""
+            #if distance < 0.3:
+            #    rewards[i] += 1
+            #if distance < 0.25:
+            #    rewards[i] += 1
+            #if distance < 0.2:
+            #    rewards[i] += 1
+            #if distance < 0.15:
+            #    rewards[i] += 1
+            #if distance < 0.1:
+            #    rewards[i] += 1
+            #if distance < 0.05:
+            #    rewards[i] += 1
         
         # Check termination
         truncated = self.step_count >= self.episode_length
