@@ -15,8 +15,6 @@ def obs_list_to_state_vector(observation):
 
 if __name__ == "__main__":
 
-    #scenario = "simple"
-    #env = make_env(scenario)
     env = MultiAgentCommEnv()
     scenario="comm"
     n_agents = env.num_agents
@@ -34,10 +32,11 @@ if __name__ == "__main__":
     memory = MultiAgentReplayBuffer(1000000, critic_dims, actor_dims, n_actions, n_agents, batch_size=1024)
 
     PRINT_INTERVAL = 10
+    RENDER_INTERVAL = 100
     N_GAMES = 30000
     total_steps = 0
     score_history = []
-    best_score = 1E10 #TODO Change this to -inf
+    best_score = -1E10 
 
     evaluate = False
     if evaluate:
@@ -68,14 +67,16 @@ if __name__ == "__main__":
             episode_step += 1
 
         score_history.append(score)
-        avg_score = np.mean(score_history[-100:])
+        avg_score = np.mean(score_history[-PRINT_INTERVAL:])
         if not evaluate:
-            if avg_score > best_score:
+            if score > best_score:
                 maddpg_agents.save_checkpoint()
-                best_score = avg_score
+                best_score = score
 
         if i % PRINT_INTERVAL == 0 and i > 0:
-            env.render()
             print(f"Episode {i}| Average score: {avg_score}")
+
+        if i % RENDER_INTERVAL == 0 and i > 0:
+            env.render()
 
     

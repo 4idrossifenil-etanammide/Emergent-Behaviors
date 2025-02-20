@@ -22,7 +22,8 @@ class Critic(nn.Module):
         )
 
         self.optimizer = optim.Adam(self.parameters(), lr=beta)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = "cpu"
         self.to(self.device)
 
     def forward(self, state, action):
@@ -62,7 +63,8 @@ class Actor(nn.Module):
         )
 
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = "cpu"
         self.to(self.device)
 
     def forward(self, state):
