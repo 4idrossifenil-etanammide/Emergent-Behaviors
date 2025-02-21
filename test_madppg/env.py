@@ -13,13 +13,13 @@ class MultiAgentCommEnv(gym.Env):
         # Environment parameters
         self.world_size = 2.0  # Size of the square world
         self.num_agents = 2
-        self.num_landmarks = 3
+        self.num_landmarks = 4
         self.episode_length = 25
         self.step_count = 0
         
         # Define color landmarks (RGB)
-        self.landmark_colors = np.array([1,2,3])
-        self.colors = [(255,0,0), (0,255,0), (0,0,255)]
+        self.landmark_colors = np.array([0,1,2,3])
+        self.colors = [(255,0,0), (0,255,0), (0,0,255), (255,255,0)]
         
         # Define action spaces (movement + communication)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, 2 + 1), dtype=np.float32)
@@ -33,7 +33,7 @@ class MultiAgentCommEnv(gym.Env):
     def reset(self, seed=None, options=None):
         # Initialize agents and landmarks randomly
         self.agent_positions = np.random.uniform(-1, 1, size=(2, 2))
-        self.landmark_positions = np.random.uniform(-1, 1, size=(3, 2))
+        self.landmark_positions = np.random.uniform(-1, 1, size=(self.num_landmarks, 2))
         self.step_count = 0
         
         # Reset communications
@@ -85,7 +85,7 @@ class MultiAgentCommEnv(gym.Env):
         self.step_count += 1
         
         # Update positions
-        self.agent_positions = self.agent_positions + actions[:, :2] * 0.1
+        self.agent_positions = np.clip(self.agent_positions + actions[:, :2] * 0.1, -0.98, 0.98)
         self.communications = actions[:, -1]
         
         self.trajectories.append(self.agent_positions.copy())
@@ -101,22 +101,20 @@ class MultiAgentCommEnv(gym.Env):
 
         rewards = np.zeros((self.num_agents))
         for i in range(self.num_agents):
+            
             distance = np.linalg.norm(self.agent_positions[i] - self.landmark_positions[self.goals[i]])
-            other_distance = np.linalg.norm(self.agent_positions[self.agent_goals[i]] - self.landmark_positions[self.goals[self.agent_goals[i]]])
-            rewards[i] = - (distance + other_distance)
-            if distance < 0.3:
-                rewards[i] += 1
-            if distance < 0.25:
-                rewards[i] += 1
-            if distance < 0.2:
-                rewards[i] += 1
+            #other_distance = np.linalg.norm(self.agent_positions[self.agent_goals[i]] - self.landmark_positions[self.goals[self.agent_goals[i]]])
+            rewards[i] = -distance*0.5
             if distance < 0.15:
                 rewards[i] += 1
             if distance < 0.1:
                 rewards[i] += 1
             if distance < 0.05:
-                rewards[i] += 1
+                rewards[i] += 1 
         
+        tmp = rewards[0]
+        rewards[0]+=rewards[1]
+        rewards[1]+=tmp
         # Check termination
         truncated = self.step_count >= self.episode_length
         #terminated = (np.abs(self.agent_positions - self.landmark_positions[self.goals]) < 0.05).all()
