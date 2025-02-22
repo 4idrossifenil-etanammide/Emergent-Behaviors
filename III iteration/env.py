@@ -4,12 +4,15 @@ from gymnasium import spaces
 
 import pygame
 import cv2
+import os
 
 VOCAB_SIZE = 10
 
 class MultiAgentCommEnv(gym.Env):
     def __init__(self):
         super().__init__()
+        
+        os.makedirs("videos", exist_ok=True) 
         
         # Environment parameters
         self.world_size = 2.0  # Size of the square world
