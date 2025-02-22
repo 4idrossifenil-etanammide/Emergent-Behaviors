@@ -24,7 +24,7 @@ def main(render=True):
     for epoch in range(1, epochs):
         world.reset()
         optimizer.zero_grad()
-        loss, history = world()
+        loss = world()
 
         loss.backward()
         optimizer.step()
