@@ -28,12 +28,15 @@ if __name__ == "__main__":
     lr = 1E-3
     maddpg_agents = MADDPG(actor_dims, critic_dims, n_agents, n_actions, fc1=64, fc2=64,
                            alpha = lr, beta = lr, scenario = dir_name, chkpt_dir = ".")
+    maddpg_agents.train = True
     
     memory = MultiAgentReplayBuffer(1000000, critic_dims, actor_dims, n_actions, n_agents, batch_size=1024)
 
     PRINT_INTERVAL = 10
-    RENDER_INTERVAL = 10
+    RENDER_INTERVAL = 50
     N_GAMES = 30000
+    EVAL_GAMES = 20
+    EVAL_OFFSET = 25
     total_steps = 0
     score_history = []
     best_score = -1E10 
@@ -41,6 +44,7 @@ if __name__ == "__main__":
     evaluate = False
     if evaluate:
         maddpg_agents.load_checkpoint()
+        maddpg_agents.train = False
 
     for i in range(N_GAMES):
         obs, _ = env.reset()
@@ -68,10 +72,34 @@ if __name__ == "__main__":
 
         score_history.append(score)
         avg_score = np.mean(score_history[-PRINT_INTERVAL:])
-        if not evaluate:
+
+        if not evaluate and i % EVAL_OFFSET == 0 and i > 0:
+
+            maddpg_agents.train = False
+            score = 0
+            
+            for j in range(EVAL_GAMES):
+                obs, _ = env.reset()
+                done = False
+                episode_step = 0
+                while not done:
+                    actions = maddpg_agents.choose_action(obs)
+                    obs_, reward, terminated, truncated, info = env.step(np.concatenate(np.expand_dims(actions, axis=0)))
+                    done = terminated or truncated
+
+                    obs = obs_
+
+                    score += sum(reward)
+                    episode_step += 1
+
+            score = score/EVAL_GAMES
+
             if score > best_score:
                 maddpg_agents.save_checkpoint()
+                print(f"New best score: {score}, Old best score: {best_score}")
                 best_score = score
+
+            maddpg_agents.train = True
 
         if i % PRINT_INTERVAL == 0 and i > 0:
             print(f"Episode {i}| Average score: {avg_score}")

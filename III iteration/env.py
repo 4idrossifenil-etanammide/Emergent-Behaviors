@@ -124,11 +124,12 @@ class MultiAgentCommEnv(gym.Env):
         rewards[1]+=tmp
         # Check termination
         truncated = self.step_count >= self.episode_length
+        terminated = False
         #terminated = (np.abs(self.agent_positions - self.landmark_positions[self.goals]) < 0.05).all()
-        terminated = np.all([
-            np.linalg.norm(self.agent_positions[i] - self.landmark_positions[self.goals[self.agent_goals[i]]]) < 0.05
-            for i in range(self.num_agents)
-        ])
+        #terminated = np.all([
+        #    np.linalg.norm(self.agent_positions[i] - self.landmark_positions[self.goals[self.agent_goals[i]]]) < 0.05
+        #    for i in range(self.num_agents)
+        #])
         
         return self._get_obs(), rewards, terminated, truncated, {}
 
