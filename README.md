@@ -91,5 +91,8 @@ This project is based on the findings of the following sources:
       url={https://arxiv.org/abs/1706.02275}, 
 }
 
+```
+
+```md
 Machine Learning with Phil. (2021, April 8). Can AI learn to cooperate? Multi Agent Deep Deterministic Policy Gradients (MADDPG) in PyTorch [Video]. YouTube. https://www.youtube.com/watch?v=tZTQ6S9PfkE
 ```
