@@ -3,6 +3,7 @@ import numpy as np
 from gymnasium import spaces
 
 import pygame
+import cv2
 
 VOCAB_SIZE = 10
 
@@ -19,7 +20,8 @@ class MultiAgentCommEnv(gym.Env):
         
         # Define color landmarks (RGB)
         self.landmark_colors = np.array([0,1,2,3])
-        self.colors = [(255,0,0), (0,255,0), (0,0,255), (255,255,0)]
+        self.true_landmark_colors = [(255,0,0), (0,255,0), (0,0,255), (255,255,0)]
+        self.true_agent_colors = [(3,187,133), (255, 140, 105)]
         
         # Define action spaces (movement + communication)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, 2 + 1), dtype=np.float32)
@@ -28,6 +30,8 @@ class MultiAgentCommEnv(gym.Env):
         self.agent_positions = None
         self.landmark_positions = None
         self.communications = np.zeros((self.num_agents))
+
+        self.render_episode_counter = 0
 
 
     def reset(self, seed=None, options=None):
@@ -127,11 +131,16 @@ class MultiAgentCommEnv(gym.Env):
 
     def render(self):
         pygame.init()
-        screen = pygame.display.set_mode((400, 400))
+        screen = pygame.display.set_mode((400, 450))  # Increase height to make room for the rectangle
         pygame.display.set_caption(f"PPO")
         clock = pygame.time.Clock()
         font = pygame.font.SysFont(None, 24)
         scale = lambda x: (int((x[0] + 1) * 200), int((x[1] + 1) * 200))
+
+        self.render_episode_counter += 1
+        filename = f"videos/episode_{self.render_episode_counter}.avi"
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        video_writer = cv2.VideoWriter(filename, fourcc, 1, (400, 450))  # Adjust height for video
 
         landmarks_scaled = [scale(l) for l in self.landmark_positions]
         scaled_trajectory = [[scale(p[i]) for p in self.trajectories] for i in range(self.num_agents)]
@@ -139,14 +148,14 @@ class MultiAgentCommEnv(gym.Env):
         for i in range(1, len(self.trajectories)+1):
             screen.fill((255, 255, 255))
             for k, landmark in enumerate(landmarks_scaled):
-                pygame.draw.circle(screen, self.colors[k], landmark, 10)
+                pygame.draw.circle(screen, self.true_landmark_colors[k], landmark, 10)
                 text = font.render(str(k), True, (0,0,0))
                 screen.blit(text, (landmark[0] - text.get_width() // 2, landmark[1] - text.get_height() // 2))
             
             # Current position
             for j, traj in enumerate(scaled_trajectory):
                 if i-1 < len(traj):
-                    pygame.draw.circle(screen, (169, 131, 7), traj[i - 1], 5) # Dark yellow agents
+                    pygame.draw.circle(screen, self.true_agent_colors[j], traj[i - 1], 5) # Dark yellow agents
                     text = font.render(str(self.goals[j]), True, (0, 0, 0))
                     screen.blit(text, (traj[i - 1][0] - text.get_width() // 2, traj[i - 1][1] - 20))
 
@@ -155,10 +164,35 @@ class MultiAgentCommEnv(gym.Env):
                     screen.blit(comm_text, (traj[i-1][0] - comm_text.get_width() // 2, traj[i-1][1] + 20))
 
                 if i > 1 and len(traj) >= 1:
-                    #pygame.draw.lines(screen, self.colors_map[self.agent_color[j].item()], False, traj[:i], 2)
-                    pass
+                    temp_surface = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+
+                    # Define the transparency level (alpha value)
+                    alpha_value = 100  # Lower than 255 means more transparent
+
+                    # Get the original color and add the desired alpha value
+                    orig_color = (169, 131, 7) # e.g., (R, G, B)
+                    color_with_alpha = self.true_agent_colors[j] + (alpha_value,)
+
+                    # Draw the line on the temporary surface with the transparent color:
+                    pygame.draw.lines(temp_surface, color_with_alpha, False, traj[:i], 2)
+
+                    # Blit the temporary surface onto the main screen:
+                    screen.blit(temp_surface, (0, 0))
             
+            pygame.draw.rect(screen, (211, 211, 211), (0, 400, 400, 50))
+            for agent_idx in range(self.num_agents):
+                history = [str(int(comm[agent_idx])) for comm in reversed(self.communications_traj[1:i])]
+                history_text = ", ".join(history)
+                text = font.render(f"Agent {agent_idx}: {history_text}", True, (0, 0, 0))
+                screen.blit(text, (10, 405 + agent_idx * 20))
+
             pygame.display.flip()
+
+            frame = pygame.surfarray.array3d(screen)
+            frame = np.transpose(frame, (1, 0, 2))  # Adjust dimensions for OpenCV
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert to BGR
+            video_writer.write(frame)
+
             clock.tick(10)
             
             for event in pygame.event.get():
@@ -166,3 +200,4 @@ class MultiAgentCommEnv(gym.Env):
                     pygame.quit()
                     return
         pygame.quit()
+        video_writer.release()

@@ -16,7 +16,7 @@ def obs_list_to_state_vector(observation):
 if __name__ == "__main__":
 
     env = MultiAgentCommEnv()
-    scenario="comm"
+    dir_name="weights"
     n_agents = env.num_agents
     actor_dims = []
     for i in range(n_agents):
@@ -27,12 +27,12 @@ if __name__ == "__main__":
 
     lr = 1E-3
     maddpg_agents = MADDPG(actor_dims, critic_dims, n_agents, n_actions, fc1=64, fc2=64,
-                           alpha = lr, beta = lr, scenario = scenario, chkpt_dir = ".")
+                           alpha = lr, beta = lr, scenario = dir_name, chkpt_dir = ".")
     
     memory = MultiAgentReplayBuffer(1000000, critic_dims, actor_dims, n_actions, n_agents, batch_size=1024)
 
     PRINT_INTERVAL = 10
-    RENDER_INTERVAL = 100
+    RENDER_INTERVAL = 10
     N_GAMES = 30000
     total_steps = 0
     score_history = []
