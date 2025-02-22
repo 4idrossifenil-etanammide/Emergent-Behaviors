@@ -45,13 +45,8 @@ class Actor(nn.Module):
         physical_features = physical_features.view(num_agents, num_land_agents, -1)
         physical_features = SoftmaxPooling(dim=-2)(physical_features) # shape: (n_agents, 256)
 
-        #CAREFUL, fixed this, abbiamo comunque bisogno di n*2 utterance features da softmaxare
-        # utterance ripetute lungo la prima dimensione per avere n copie delle utterance da dare agli n agenti
-        #memories ripetute lungo la seconda dimensione e poi modificata view, in modo tale da avere
-        #  n_agents tensori, ciascuno con una memoria ripetuta n_agents volte (la stessa memoria
-        #  va applicata a tutti i canali di comunicazione per ciascun agente)
         utterances_input = torch.cat([utterances.repeat(num_agents, 1, 1) , 
-                                      memories.repeat(1,num_agents).view(num_agents, num_agents, -1)], dim = 2) #change this dim to go from the right
+                                      memories.repeat(1,num_agents).view(num_agents, num_agents, -1)], dim = 2)
         utterances_features = self.utterance_processor(utterances_input)
         utterances_features = SoftmaxPooling(dim=-2)(utterances_features)
         

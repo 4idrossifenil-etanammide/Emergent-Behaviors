@@ -32,9 +32,8 @@ class ActorCritic(nn.Module):
         actions_means, utterances_logits, delta_memories, physical_features, utterances_features = self.actor(physical, utterances, memories, tasks)
 
         action_std = torch.exp(self.log_std).clamp(min=1e-6)
-        dist = Normal(actions_means, action_std) #removed an unsqueeze here
+        dist = Normal(actions_means, action_std)
         next_utterances = F.gumbel_softmax(utterances_logits, tau=1.0, hard=True)
-        #critic should be evaluating actor's action
         return dist, next_utterances, delta_memories, self.critic(torch.cat([physical_features, utterances_features, memories, tasks], dim = -1))
 
 class PPO:
