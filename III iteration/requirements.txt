@@ -1,4 +1,4 @@
-numpy
+numpy==1.24.4
 torch==1.4.0
-gymansium
-pygame
+gymansium==1.0.0
+pygame==2.6.1
