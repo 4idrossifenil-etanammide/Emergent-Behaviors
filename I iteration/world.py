@@ -1,7 +1,7 @@
 from physical_processor import PhysicalProcessor
 from utterance_processor import UtteranceProcessor
 from softmax_pooling import SoftmaxPooling
-from old.action_processor import ActionProcessor
+from action_processor import ActionProcessor
 from math import cos, sin
 
 import torch

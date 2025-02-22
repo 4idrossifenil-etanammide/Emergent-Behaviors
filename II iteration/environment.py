@@ -142,7 +142,6 @@ class EmergentEnv(gym.Env):
             if truncated and distances[i] < 0.15:
                 reward = start_distances[i].item() - distances[i].item()
                 reward += 2.0
-                print("hooraaay")
             elif truncated:
                 reward = -distances[i].item()*0.4
 

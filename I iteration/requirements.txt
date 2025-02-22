@@ -1,4 +1,4 @@
-epygame
+pygame
 torch
 numpy
 gymnasium

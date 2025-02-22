@@ -1,7 +1,5 @@
 from world import World
-from renderer import Renderer
 
-import random
 import json
 
 import torch
@@ -22,15 +20,11 @@ def main(render=True):
     optimizer = torch.optim.Adam(world.parameters(), lr=1E-3)
     epochs = 1000
 
-    renderer = Renderer(config["world"]["num_shapes"], config["world"]["width"], config["world"]["height"])
 
     for epoch in range(1, epochs):
         world.reset()
         optimizer.zero_grad()
         loss, history = world()
-
-        if render & (epoch%100 == 0) :
-            renderer.render(history, epoch)
 
         loss.backward()
         optimizer.step()
