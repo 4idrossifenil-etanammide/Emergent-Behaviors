@@ -1,7 +1,7 @@
 # ⚠️ Disclaimer: Uni Project Repo 🚧
 Before you dive into this repo, here are a few things you should know:
 
-📌 This was a university project – meaning it was built with deadlines, specific exam requirements, and a whole lot of learning along the way.
+📌 This repository was created for the course _Reinforcement Learning (2025)_ – meaning it was built with deadlines, specific exam requirements, and a whole lot of learning along the way.
 
 🛠️ Expect rough edges – You might find some less-than-ideal code, typos, missing documentation, or even bits of unused logic hanging around. It happens.
 
@@ -55,8 +55,8 @@ The only important precaution is to install PyTorch version 1.4.0 if you want to
 
 1. Clone the repository:
    ```sh
-   git clone <repository-url>
-   cd project
+   git clone https://github.com/4idrossifenil-etanammide/Emergent-Behaviors.git
+   cd <folder_name>
    ```
 
 2. Create a virtual environment and activate it:
